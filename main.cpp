@@ -1,102 +1,220 @@
 #include <SFML/Graphics.hpp>
 #include <iostream> 
-#include "map.h"
-#include "view.h"//подключили код с видом камеры
+//#include "map.h"
+#include "view.h"
+#include "TinyXML\tinyxml.h"
+#include "level.h"
+#include <vector>
+#include <list>
 
 using namespace sf;
-
 ///////////////////////////////////////////////////КЛАСС ИГРОКА////////////////////////
-class Player { // класс Игрока
+/*struct player {
+	float x, y, w=91, h=54, wgun = 72, hgun = 20, dx = 0, dy = 0, speed = 0;
+	int dir = -1, dir2 = -1, health = 100;
+	bool life = true;
+};*/
+class Entity {
 public:
-	float x, y, w, h, dx, dy, speed = 0;//высота ширина, ускорение (по х и по у), сама скорость
-	int dir = 0, dir2 = 0; //направление (direction) движения игрока
-	String File; //файл с расширением
-	Image image;//сфмл изображение
-	Texture texture;//сфмл текстура
-	Sprite sprite;//сфмл спрайт
-	Player(String F, float X, float Y, float W, float H) {  //Конструктор с параметрами(формальными) для класса Player. При создании объекта класса мы будем задавать имя файла, координату Х и У, ширину и высоту
-		File = F;//имя файла+расширение
-		w = W; h = H;//высота и ширина
-		image.loadFromFile("images/" + File);//запихиваем в image наше изображение вместо File мы передадим то, что пропишем при создании объекта. В нашем случае "hero.png" и получится запись идентичная 	image.loadFromFile("images/hero/png");
-		texture.loadFromImage(image);//закидываем наше изображение в текстуру
-		sprite.setTexture(texture);//заливаем спрайт текстурой
-		x = X; y = Y;//координата появления спрайта
-		sprite.setTextureRect(IntRect(0, 0, w, h));  //Задаем спрайту один прямоугольник для вывода одного льва, а не кучи львов сразу. IntRect - приведение типов
+	std::vector<Object> obj;//вектор объектов карты
+	float dx, dy, x, y, speed, moveTimer;//добавили переменную таймер для будущих целей
+	int w, h, health;
+	bool life, isMove;
+	Texture texture, gunTexture;
+	Sprite sprite, gunSprite;
+	String name;//враги могут быть разные, мы не будем делать другой класс для врага.всего лишь различим врагов по имени и дадим каждому свое действие в update в зависимости от имени
+	Entity(Image &image, Image &gunImage, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) {
+		x = X; y = Y; w = W; h = H; name = Name; moveTimer = 0;
+		speed = 0; health = 100; dx = 0; dy = 0;
+		life = true; isMove = false;
+		texture.loadFromImage(image);
+		gunTexture.loadFromImage(gunImage);
+		sprite.setTexture(texture);
+		gunSprite.setTexture(gunTexture);
+		sprite.setOrigin(w / 2, h / 2);
 	}
-	void update(float time) //функция "оживления" объекта класса. update - обновление. принимает в себя время SFML , вследствие чего работает бесконечно, давая персонажу движение.
-	{
-		switch (dir)//реализуем поведение в зависимости от направления. (каждая цифра соответствует направлению)
-		{
-		case 0: dx = speed; dy = 0;   break;//по иксу задаем положительную скорость, по игреку зануляем. получаем, что персонаж идет только вправо
-		case 1: dx = -speed; dy = 0;   break;//по иксу задаем отрицательную скорость, по игреку зануляем. получается, что персонаж идет только влево
-		case 2: dx = 0; dy = speed;   break;//по иксу задаем нулевое значение, по игреку положительное. получается, что персонаж идет только вниз
-		case 3: dx = 0; dy = -speed;   break;//по иксу задаем нулевое значение, по игреку отрицательное. получается, что персонаж идет только вверх
-		}
-		switch (dir2)//реализуем поведение в зависимости от направления. (каждая цифра соответствует направлению)
-		{
-		case 0: dx = speed;   break;//по иксу задаем положительную скорость, по игреку зануляем. получаем, что персонаж идет только вправо
-		case 1: dx = -speed;   break;//по иксу задаем отрицательную скорость, по игреку зануляем. получается, что персонаж идет только влево
-		case 2: dy = speed;   break;//по иксу задаем нулевое значение, по игреку положительное. получается, что персонаж идет только вниз
-		case 3: dy = -speed;   break;//по иксу задаем нулевое значение, по игреку отрицательное. получается, что персонаж идет только вверх
-		}
-		x += dx*time;//то движение из прошлого урока. наше ускорение на время получаем смещение координат и как следствие движение
-		y += dy*time;//аналогично по игреку
-		speed = 0;//зануляем скорость, чтобы персонаж остановился.
-		sprite.setPosition(x, y); //выводим спрайт в позицию x y , посередине. бесконечно выводим в этой функции, иначе бы наш спрайт стоял на месте.
-		interactionWithMap();//вызываем функцию, отвечающую за взаимодействие с картой
+	virtual void update(float time) = 0;
+	FloatRect getRect() {//ф-ция получения прямоугольника. его коорд,размеры (шир,высот).
+		return FloatRect(x, y, w, h);//эта ф-ция нужна для проверки столкновений 
+	}
+};
+class Player :public Entity {
+public:
+	enum { left, right, up, down, jump, stay } state;//добавляем тип перечисления - состояние объекта
+	float rotation;
+	int playerScore;//эта переменная может быть только у игрока
 
+	Player(Image &image, Image &gunImage, Level &lev, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, gunImage, X, Y, W, H, Wgun, Hgun, Name) {
+		playerScore = 0; state = stay; obj = lev.GetAllObjects();
+		if (name == "Player") {
+			sprite.setTextureRect(IntRect(0, 0, w, h));
+			gunSprite.setTextureRect(IntRect(0, 0, Wgun, Hgun));
+		}
 	}
-	float getplayercoordinateX() {	//этим методом будем забирать координату Х	
-		return x;
-	}
-	float getplayercoordinateY() {	//этим методом будем забирать координату Y 	
-		return y;
-	}
-	void interactionWithMap()//ф-ция взаимодействия с картой
-	{
 
-		for (int i = y / 54; i < (y + h) / 54; i++)//проходимся по всей карте, то есть по всем квадратикам размера 32*32, которые мы окрашивали в 9 уроке. про условия читайте ниже.
-			for (int j = x / 54; j < (x + w) / 54; j++)//икс делим на 32, тем самым получаем левый квадратик, с которым персонаж соприкасается. (он ведь больше размера 32*32, поэтому может одновременно стоять на нескольких квадратах). А j<(x + w) / 32 - условие ограничения координат по иксу. то есть координата самого правого квадрата, который соприкасается с персонажем. таким образом идем в цикле слева направо по иксу, проходя по от левого квадрата (соприкасающегося с героем), до правого квадрата (соприкасающегося с героем)
+	void control() {
+		if (Keyboard::isKeyPressed) {//если нажата клавиша
+			if (Keyboard::isKeyPressed(Keyboard::Left)) {//а именно левая
+				state = left; speed = 0.2;
+			}
+			if (Keyboard::isKeyPressed(Keyboard::Right)) {
+				state = right; speed = 0.2;
+			}
+
+			if (Keyboard::isKeyPressed(Keyboard::Up)) {//если нажата клавиша вверх и мы на земле, то можем прыгать
+				state = up; speed = 0.2;//увеличил высоту прыжка
+			}
+
+			if (Keyboard::isKeyPressed(Keyboard::Down)) {
+				state = down; speed = 0.2;
+			}
+		}
+	}
+	void rotation_GG(Vector2f pos) {
+		float dX = pos.x - x;//вектор , колинеарный прямой, которая пересекает спрайт и курсор
+		float dY = pos.y - y;//он же, координата y
+		rotation = (atan2(dY, dX)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
+	}
+	void checkCollisionWithMap(float Dx, float Dy)//ф ция проверки столкновений с картой
+	{
+		for (int i = 0; i<obj.size(); i++)//проходимся по объектам
+			if (getRect().intersects(obj[i].rect))//проверяем пересечение игрока с объектом
 			{
-				if (TileMap[i][j] == '1')//если наш квадратик соответствует символу 0 (стена), то проверяем "направление скорости" персонажа:
+				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					std::cout << i << " " << j << "\n";
-					if (dy > 0)//если мы шли вниз,
-					{
-						y = i * 50 - 1;//то стопорим координату игрек персонажа. сначала получаем координату нашего квадратика на карте(стены) и затем вычитаем из высоты спрайта персонажа.
-					}
-					if (dy < 0)
-					{
-						y = i * 50 + 100;//аналогично с ходьбой вверх. dy<0, значит мы идем вверх (вспоминаем координаты паинта)
-					}
-					if (dx > 0)
-					{
-						x = j * 50 - 1;//если идем вправо, то координата Х равна стена (символ 0) минус ширина персонажа
-					}
-					if (dx < 0)
-					{
-						x = j * 50 + 100;//аналогично идем влево
-					}
-				}
-
-				if (TileMap[i][j] == 's') { //если символ равен 's' (камень)
-					x = 300; y = 300;//какое то действие... например телепортация героя
-					TileMap[i][j] = ' ';//убираем камень, типа взяли бонус. можем и не убирать, кстати.
+					if (Dy>0) { y = obj[i].rect.top - h;  dy = 0; }
+					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0; }
+					if (Dx>0) { x = obj[i].rect.left - w; }
+					if (Dx<0) { x = obj[i].rect.left + obj[i].rect.width; }
 				}
 			}
 	}
+
+	void update(float time)
+	{
+		sprite.setRotation(rotation);//поворачиваем спрайт на эти градусы
+		gunSprite.setRotation(rotation);
+		control();//функция управления персонажем
+		switch (state)//тут делаются различные действия в зависимости от состояния
+		{
+		case right:dx = speed; dy = 0;break;//состояние идти вправо
+		case left:dx = -speed; dy = 0; break;//состояние идти влево
+		case up: dx = 0; dy = -speed; break;//будет состояние поднятия наверх (например по лестнице)
+		case down: dx = 0; dy = speed; break;//будет состояние во время спуска персонажа (например по лестнице)
+		case stay: break;//и здесь тоже		
+		}
+		x += dx*time;
+		checkCollisionWithMap(dx, 0);//обрабатываем столкновение по Х
+		y += dy*time;
+		checkCollisionWithMap(0, dy);//обрабатываем столкновение по Y
+		sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+		gunSprite.setPosition(x + w / 2, y + h / 2);
+		if (health <= 0) { life = false; }
+		if (!isMove) { speed = 0; }
+		if (life) { getPlayerCoordinateForView(x, y); }
+	}
+};
+class Enemy :public Entity {
+public:
+	Enemy(Image &image, Image &gunImage, Level &lvl, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, gunImage, X, Y, W, H, Wgun, Hgun, Name) {
+		obj = lvl.GetObjects("solid");
+		if (name == "EasyEnemy") {
+			sprite.setTextureRect(IntRect(0, 0, w, h));
+			dx = -0.1;//даем скорость.этот объект всегда двигается
+			dy = -0.1;
+		}
+	}
+
+	void checkCollisionWithMap(float Dx, float Dy){//ф ция проверки столкновений с картой
+		for (int i = 0; i<obj.size(); i++)//проходимся по объектам
+			if (getRect().intersects(obj[i].rect))//проверяем пересечение игрока с объектом
+			{
+				if (obj[i].name == "solid")//если встретили препятствие
+				{
+					if (Dy>0) { y = obj[i].rect.top - h;  dy = 0; }
+					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0; }
+					if (Dx>0) { x = obj[i].rect.left - w; }
+					if (Dx < 0) { x = obj[i].rect.left + obj[i].rect.width; dx = 0.1; }
+				}
+			}
+	}
+
+	void update(float time){
+		if (name == "EasyEnemy") {//для персонажа с таким именем логика будет такой
+			checkCollisionWithMap(dx, dy);//обрабатываем столкновение по Х
+			x += dx*time;
+			y += dy*time;
+			sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+			if (health <= 0) { life = false; }
+		}
+	}
 };
 
-void move_player(float rotation, float time, Player &p, float &CurrentFrame) {
+/*void interactionWithMap(player &p)//ф-ция взаимодействия с картой
+{
+	for (int i = p.y / 53; i < (p.y + p.h) / 53; i++)//проходимся по всей карте, то есть по всем квадратикам размера 32*32, которые мы окрашивали в 9 уроке. про условия читайте ниже.
+		for (int j = p.x / 54; j < (p.x + p.w) / 54; j++)//икс делим на 32, тем самым получаем левый квадратик, с которым персонаж соприкасается. (он ведь больше размера 32*32, поэтому может одновременно стоять на нескольких квадратах). А j<(x + w) / 32 - условие ограничения координат по иксу. то есть координата самого правого квадрата, который соприкасается с персонажем. таким образом идем в цикле слева направо по иксу, проходя по от левого квадрата (соприкасающегося с героем), до правого квадрата (соприкасающегося с героем)
+		{
+			if (TileMap[i][j] == '1')//если наш квадратик соответствует символу 0 (стена), то проверяем "направление скорости" персонажа:
+			{
+				if (p.dy > 0)//если мы шли вниз,
+				{
+					p.y = i * 50 - 1;//то стопорим координату игрек персонажа. сначала получаем координату нашего квадратика на карте(стены) и затем вычитаем из высоты спрайта персонажа.
+				}
+				if (p.dy < 0)
+				{
+					p.y = i * 50 + 100;//аналогично с ходьбой вверх. dy<0, значит мы идем вверх (вспоминаем координаты паинта)
+				}
+				if (p.dx > 0)
+				{
+					p.x = j * 50 - 1;//если идем вправо, то координата Х равна стена (символ 0) минус ширина персонажа
+				}
+				if (p.dx < 0)
+				{
+					p.x = j * 50 + 100;//аналогично идем влево
+				}
+			}
+			if (TileMap[i][j] == 'e') {
+				p.health -= 40;//если взяли ядовитейший в мире цветок,то переменная health=health-40;
+				TileMap[i][j] = '0';//убрали цветок
+			}
+		}
+}*/
+
+/*void player_control(player &p, float time, Sprite &hero, Sprite &gun) //функция "оживления" объекта класса. update - обновление. принимает в себя время SFML , вследствие чего работает бесконечно, давая персонажу движение.
+{
+	if (p.dir == 0)//реализуем поведение в зависимости от направления. (каждая цифра соответствует направлению)
+	{
+		p.dx = p.speed; p.dy = 0;
+	}//вправо
+	if (p.dir == 1)
+	{
+		p.dx = -p.speed; p.dy = 0;
+	}//влево
+	if (p.dir == 2)
+	{
+		p.dx = 0; p.dy = p.speed;
+	}//вниз
+	if (p.dir == 3)
+	{
+		p.dx = 0; p.dy = -p.speed;
+	}//вверх
+	p.x += p.dx*time;//то движение из прошлого урока. наше ускорение на время получаем смещение координат и как следствие движение
+	p.y += p.dy*time;//аналогично по игреку
+	p.speed = 0;//зануляем скорость, чтобы персонаж остановился.
+	interactionWithMap(p);//вызываем функцию, отвечающую за взаимодействие с картой
+	hero.setPosition(p.x, p.y); //выводим спрайт в позицию x y , посередине. бесконечно выводим в этой функции, иначе бы наш спрайт стоял на месте.
+	gun.setPosition(p.x, p.y);
+	if (p.health <= 0) { p.life = false; p.speed = 0; }//если жизней меньше либо равно 0, то умираем и исключаем движение игрока после смерти
+}*/
+
+/*void move_player(float rotation, float time, player &p, float &CurrentFrame, Sprite &hero, Sprite &gun) {
 	bool press = false;
-	p.sprite.setRotation(rotation);//поворачиваем спрайт на эти градусы
+	hero.setRotation(rotation);//поворачиваем спрайт на эти градусы
+	gun.setRotation(rotation);
 	if ((Keyboard::isKeyPressed(Keyboard::Left) || (Keyboard::isKeyPressed(Keyboard::A)))) {
 		press = true;
 		p.dir = 1; p.speed = 0.2; p.dir2 = -1;//dir =1 - направление вверх, speed =0.1 - скорость движения. Заметьте - время мы уже здесь ни на что не умножаем и нигде не используем каждый раз
-		CurrentFrame += 0.005*time;
-		if (CurrentFrame > 4) CurrentFrame -= 4;
-		p.sprite.setTextureRect(IntRect(0, 54 * int(CurrentFrame), 91, 54)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
-		getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камерой
 	}
 
 	if ((Keyboard::isKeyPressed(Keyboard::Right) || (Keyboard::isKeyPressed(Keyboard::D)))) {
@@ -105,10 +223,6 @@ void move_player(float rotation, float time, Player &p, float &CurrentFrame) {
 		else {
 			press = true;
 			p.dir = 0; p.speed = 0.2;p.dir2 = -1;//направление вправо, см выше
-			CurrentFrame += 0.005*time;
-			if (CurrentFrame > 4) CurrentFrame -= 4;
-			p.sprite.setTextureRect(IntRect(0, 54 * int(CurrentFrame), 91, 54)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
-			getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
 		}
 	}
 
@@ -118,10 +232,6 @@ void move_player(float rotation, float time, Player &p, float &CurrentFrame) {
 		else {
 			press = true;
 			p.dir = 3; p.speed = 0.2; p.dir2 = -1;//направление вправо, см выше
-			CurrentFrame += 0.005*time;
-			if (CurrentFrame > 4) CurrentFrame -= 4;
-			p.sprite.setTextureRect(IntRect(0, 54 * int(CurrentFrame), 91, 54)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
-			getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
 		}
 	}
 
@@ -131,34 +241,52 @@ void move_player(float rotation, float time, Player &p, float &CurrentFrame) {
 		else {
 			press = true;
 			p.dir = 2; p.speed = 0.2; p.dir2 = -1;//направление вправо, см выше
-			CurrentFrame += 0.005*time;
-			if (CurrentFrame > 4) CurrentFrame -= 4;
-			p.sprite.setTextureRect(IntRect(0, 54 * int(CurrentFrame), 91, 54)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
-			getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
 		}
 	}
-}
+	CurrentFrame += 0.005*time;
+	if (CurrentFrame > 4) CurrentFrame -= 4;
+	hero.setTextureRect(IntRect(0, p.h * int(CurrentFrame), p.w, p.h)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
+	getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
+}*/
+
 int main()
 {
 	sf::RenderWindow window(sf::VideoMode(1370, 768), "Alien Overkill");
 	view.reset(sf::FloatRect(0, 0, 1370, 768));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
-	Player p("players_anim.png", 800, 800, 91, 54);//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
+
+	Level lvl;//создали экземпляр класса уровень
+	lvl.LoadFromFile("map.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
+
+	Object player = lvl.GetObject("player");//объект игрока на нашей карте.задаем координаты игроку в начале при помощи него
+	//Object easyEnemyObject = lvl.GetObject("easyEnemy");//объект легкого врага на нашей карте.задаем координаты игроку в начале при помощи него
+
+	std::list<Entity*>  entities;//создаю список, сюда буду кидать объекты.например врагов.
+	std::list<Entity*>::iterator it;//итератор чтобы проходить по эл-там списка
+
+	std::vector<Object> e = lvl.GetObjects("easyEnemy");//все объекты врага на tmx карте хранятся в этом векторе
+
+
+	Image heroImage, gunImage, easyEnemyImage;
+	heroImage.loadFromFile("images/players_anim.png");
+	gunImage.loadFromFile("images/weapon.png");
+	easyEnemyImage.loadFromFile("images/easy_enemy.png");
+	std::cout << player.rect.left << player.rect.top;
+	Player p(heroImage, gunImage, lvl, player.rect.left, player.rect.top, 91, 54, 72, 20, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
 	Clock clock;
-	float dX = 0;
-	float dY = 0;
+
+	for (int i = 0; i < e.size(); i++)//проходимся по элементам этого вектора(а именно по врагам)
+		entities.push_back(new Enemy(easyEnemyImage, gunImage, lvl, e[i].rect.left, e[i].rect.top, 43, 75, 0, 0, "EasyEnemy"));//и закидываем в список всех наших врагов с карты
+
+	//Enemy easyEnemy(easyEnemyImage, gunImage, lvl, easyEnemyObject.rect.left, easyEnemyObject.rect.top, 43, 75, 0, 0, "EasyEnemy");
 	bool ret = false;
-	Image map_image;//объект изображения для карты
-	map_image.loadFromFile("images/map.png");//загружаем файл для карты
-	Texture map;//текстура карты
-	map.loadFromImage(map_image);//заряжаем текстуру картинкой
-	Sprite s_map;//создаём спрайт для карты
-	s_map.setTexture(map);//заливаем текстуру спрайтом
+
 	float CurrentFrame = 0;//хранит текущий кадр
 	while (window.isOpen())
 	{
 		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
 		Vector2f pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
 		float time = clock.getElapsedTime().asMicroseconds();
+
 		clock.restart();
 		time = time / 800;
 		sf::Event event;
@@ -166,27 +294,18 @@ int main()
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
-		}///////////////////////////////////////////Управление персонажем с анимацией////////////////////////////////////////////////////////////////////////
-		float dX = pos.x - p.x;//вектор , колинеарный прямой, которая пересекает спрайт и курсор
-		float dY = pos.y - p.y;//он же, координата y
-		float rotation = (atan2(dY, dX)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
-		//std::cout << rotation << "\n";//смотрим на градусы в консольке
-		move_player(rotation, time, p, CurrentFrame);
-		p.update(time);//оживляем объект p класса Player с помощью времени sfml, передавая время в качестве параметра функции update. благодаря этому персонаж может двигаться
-		window.setView(view);//"оживляем" камеру в окне sfml
+		}
+		p.rotation_GG(pos);
+		p.update(time);// Player update function	
+		for (it = entities.begin(); it != entities.end(); it++) { (*it)->update(time); }//для всех элементов списка(пока это только враги,но могут быть и пули к примеру) активируем ф-цию update
+		window.setView(view);
 		window.clear();
-		/////////////////////////////Рисуем карту/////////////////////
-		for (int i = 0; i < HEIGHT_MAP; i++)
-			for (int j = 0; j < WIDTH_MAP; j++)
-			{
-				if (TileMap[i][j] == '0')  s_map.setTextureRect(IntRect(0, 0, 50, 50)); //если встретили символ пробел, то рисуем 1й квадратик
-				if (TileMap[i][j] == '1') s_map.setTextureRect(IntRect(100, 0, 50, 50));//если встретили символ 0, то рисуем 3й квадратик
-
-
-				s_map.setPosition(j * 50,  i * 50);//по сути раскидывает квадратики, превращая в карту. то есть задает каждому из них позицию. если убрать, то вся карта нарисуется в одном квадрате 32*32 и мы увидим один квадрат
-
-				window.draw(s_map);//рисуем квадратики на экран
-			}
+		lvl.Draw(window);//рисуем новую карту
+		for (it = entities.begin(); it != entities.end(); it++) {
+			window.draw((*it)->sprite); //рисуем entities объекты (сейчас это только враги)
+		}
+		//window.draw(easyEnemy.sprite);
+		window.draw(p.gunSprite);
 		window.draw(p.sprite);
 		window.display();
 	}
