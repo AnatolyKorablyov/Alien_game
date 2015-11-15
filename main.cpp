@@ -19,18 +19,16 @@ public:
 	std::vector<Object> obj;//вектор объектов карты
 	float dx, dy, x, y, speed, moveTimer;//добавили переменную таймер для будущих целей
 	int w, h, health;
-	bool life, isMove;
+	bool life, isMove, isSelect;
 	Texture texture, gunTexture;
 	Sprite sprite, gunSprite;
 	String name;//враги могут быть разные, мы не будем делать другой класс для врага.всего лишь различим врагов по имени и дадим каждому свое действие в update в зависимости от имени
-	Entity(Image &image, Image &gunImage, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) {
+	Entity(Image &image, float X, float Y, int W, int H, String Name) {
 		x = X; y = Y; w = W; h = H; name = Name; moveTimer = 0;
 		speed = 0; health = 100; dx = 0; dy = 0;
 		life = true; isMove = false;
 		texture.loadFromImage(image);
-		gunTexture.loadFromImage(gunImage);
 		sprite.setTexture(texture);
-		gunSprite.setTexture(gunTexture);
 		sprite.setOrigin(w / 2, h / 2);
 	}
 	FloatRect getRect() {//ф-ция получения прямоугольника. его коорд,размеры (шир,высот).
@@ -38,14 +36,16 @@ public:
 	}
 	virtual void update(float time) = 0;
 };
+
 class Player :public Entity {
 public:
-	enum { left, right, up, down, jump, stay } state;//добавляем тип перечисления - состояние объекта
+	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
 	float rotation;
 	int playerScore;//эта переменная может быть только у игрока
-
-	Player(Image &image, Image &gunImage, Level &lev, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, gunImage, X, Y, W, H, Wgun, Hgun, Name) {
-		playerScore = 0; state = stay; obj = lev.GetAllObjects();
+	Player(Image &image, Image &gunImage, Level &lev, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, X, Y, W, H, Name) {
+		playerScore = 0; state = stay; isSelect = false; obj = lev.GetAllObjects();
+		gunTexture.loadFromImage(gunImage);
+		gunSprite.setTexture(gunTexture);
 		if (name == "Player") {
 			sprite.setTextureRect(IntRect(0, 0, w, h));
 			gunSprite.setTextureRect(IntRect(0, 0, Wgun, Hgun));
@@ -53,20 +53,40 @@ public:
 	}
 
 	void control() {
-		if (Keyboard::isKeyPressed) {//если нажата клавиша
-			if (Keyboard::isKeyPressed(Keyboard::Left)) {//а именно левая
-				state = left; speed = 0.2;
-			}
-			if (Keyboard::isKeyPressed(Keyboard::Right)) {
-				state = right; speed = 0.2;
-			}
+		bool pressBut = false;
+		if (Keyboard::isKeyPressed(Keyboard::Left)) {//а именно левая
+			state = left; speed = 0.2;
+			pressBut = true;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Right)) {
+			state = right; speed = 0.2;
+			pressBut = true;
+		}
 
-			if (Keyboard::isKeyPressed(Keyboard::Up)) {//если нажата клавиша вверх и мы на земле, то можем прыгать
+		if (Keyboard::isKeyPressed(Keyboard::Up)) {//если нажата клавиша вверх и мы на земле, то можем прыгать
+			if (pressBut) {
+				if (state == right) {
+					state = rightUp; speed = 0.2;
+				}
+				if (state == left) {
+					state = leftUp; speed = 0.2;
+				}
+			}
+			else {
 				state = up; speed = 0.2;//увеличил высоту прыжка
 			}
-
-			if (Keyboard::isKeyPressed(Keyboard::Down)) {
-				state = down; speed = 0.2;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Down)) {
+			if (pressBut) {
+				if (state == right) {
+					state = rightDown; speed = 0.2;
+				}
+				if (state == left) {
+					state = leftDown; speed = 0.2;
+				}
+			}
+			else {
+				state = down; speed = 0.2;//увеличил высоту прыжка
 			}
 		}
 	}
@@ -98,7 +118,11 @@ public:
 		switch (state)//тут делаются различные действия в зависимости от состояния
 		{
 		case right:dx = speed; dy = 0;break;//состояние идти вправо
+		case rightUp: dx = speed; dy = -speed; break;
+		case rightDown: dx = speed; dy = speed; break;
 		case left:dx = -speed; dy = 0; break;//состояние идти влево
+		case leftUp: dx = -speed; dy = -speed; break;
+		case leftDown: dx = -speed; dy = speed; break;
 		case up: dx = 0; dy = -speed; break;//будет состояние поднятия наверх (например по лестнице)
 		case down: dx = 0; dy = speed; break;//будет состояние во время спуска персонажа (например по лестнице)
 		case stay: break;//и здесь тоже		
@@ -115,14 +139,15 @@ public:
 		if (life) { getPlayerCoordinateForView(x, y); }
 	}
 };
+
 class Enemy :public Entity {
 public:
-	Enemy(Image &image, Image &gunImage, Level &lvl, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, gunImage, X, Y, W, H, Wgun, Hgun, Name) {
+	Enemy(Image &image, Image &gunImage, Level &lvl, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, X, Y, W, H, Name) {
 		obj = lvl.GetObjects("solid");
 		if (name == "easyEnemy") {
 			sprite.setTextureRect(IntRect(0, 0, w, h));
 			dx = -0.1;//даем скорость.этот объект всегда двигается
-			dy = -0.1;
+			//dy = -0.1;
 		}
 	}
 
@@ -132,9 +157,9 @@ public:
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (Dy>0) { y = obj[i].rect.top - h;  dy = 0; }
-					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0; }
-					if (Dx>0) { x = obj[i].rect.left - w; }
+					if (Dy>0) { y = obj[i].rect.top - h;  dy = -0.1; }
+					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0.1; }
+					if (Dx > 0) { x = obj[i].rect.left - w; dx = -0.1; }
 					if (Dx < 0) { x = obj[i].rect.left + obj[i].rect.width; dx = 0.1; }
 				}
 			}
@@ -148,6 +173,71 @@ public:
 			sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
 			if (health <= 0) { life = false; }
 		}
+	}
+};
+
+class Bullet :public Entity {//класс пули
+public:
+	int direction;//направление пули
+	float tempy, tempx, rotation, Dx, Dy;
+	Bullet(Image &image, Level &lvl, float X, float Y, int W, int H, float tempX, float tempY, String Name) :Entity(image, X, Y, W, H, Name) {//всё так же, только взяли в конце состояние игрока (int dir)
+		obj = lvl.GetObjects("solid");//инициализируем .получаем нужные объекты для взаимодействия пули с картой
+		x = X;
+		y = Y;
+		speed = 0.1;
+		tempx = tempX;
+		tempy = tempY;
+		w = W;
+		h = H;
+		life = true;
+		dx = x;
+		dy = y;
+		life = true;
+		Dx = tempx - x;
+		Dy = tempy - y;
+		rotation = (atan2(Dy, Dx)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
+		//выше инициализация в конструкторе
+	}
+
+
+	void update(float time)
+	{
+		x += speed * (tempx - dx);//???? ?? ???? ? ??????? ??????? ???????
+		y += speed * (tempy - dy);//???? ?? ?????? ??? ??
+
+		if (x <= 0) x = 1;// ???????? ???? ? ????? ?????, ????? ??? ?????????? ?????? ??? ???????? ?? ???????? ?? ?????? ????? ? ?? ???? ??????
+		if (y <= 0) y = 1;
+
+		for (int i = 0; i < obj.size(); i++) {//?????? ?? ???????? solid
+			if (getRect().intersects(obj[i].rect)) //???? ???? ?????? ?????????? ? ?????,
+			{
+				life = false;// ?? ???? ???????
+			}
+		}
+		/*switch (direction)
+		{
+		case 0: dx = -speed; dy = 0;   break;//интовое значение state = left
+		case 1: dx = speed; dy = 0;   break;//интовое значение state = right
+		case 2: dx = 0; dy = -speed;   break;//интовое значение state = up
+		case 3: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
+		case 4: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
+		case 5: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
+		}
+
+		x += dx*time;//само движение пули по х
+		y += dy*time;//по у
+
+		if (x <= 0) x = 1;// задержка пули в левой стене, чтобы при проседании кадров она случайно не вылетела за предел карты и не было ошибки
+		if (y <= 0) y = 1;
+
+		for (int i = 0; i < obj.size(); i++) {//проход по объектам solid
+			if (getRect().intersects(obj[i].rect)) //если этот объект столкнулся с пулей,
+			{
+				life = false;// то пуля умирает
+			}
+		}*/
+		sprite.setRotation(rotation);
+		sprite.setPosition(x + w / 2, y + h / 2);//задается позицию пуле
 	}
 };
 
@@ -250,8 +340,10 @@ public:
 	getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
 }*/
 
-int main()
-{
+int main(){
+	int tempX = 0;//временная коорд Х.Снимаем ее после нажатия прав клав мыши
+	int tempY = 0;//коорд Y
+	float distance = 0;//это расстояние от объекта до тыка курсора
 	sf::RenderWindow window(sf::VideoMode(1370, 768), "Alien Overkill");
 	view.reset(sf::FloatRect(0, 0, 1370, 768));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
 
@@ -259,15 +351,15 @@ int main()
 	lvl.LoadFromFile("map.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
 
 	Object player = lvl.GetObject("player");//объект игрока на нашей карте.задаем координаты игроку в начале при помощи него
-	//Object easyEnemyObject = lvl.GetObject("easyEnemy");//объект легкого врага на нашей карте.задаем координаты игроку в начале при помощи него
-
+	
 	std::list<Entity*>  entities;//создаю список, сюда буду кидать объекты.например врагов.
 	std::list<Entity*>::iterator it;//итератор чтобы проходить по эл-там списка
 
 	std::vector<Object> e = lvl.GetObjects("easyEnemy");//все объекты врага на tmx карте хранятся в этом векторе
 
 
-	Image heroImage, gunImage, easyEnemyImage;
+	Image heroImage, gunImage, easyEnemyImage, bulletImage;
+	bulletImage.loadFromFile("images/shot.png");
 	heroImage.loadFromFile("images/players_anim.png");
 	gunImage.loadFromFile("images/weapon.png");
 	easyEnemyImage.loadFromFile("images/easy_enemy.png");
@@ -284,6 +376,7 @@ int main()
 	float CurrentFrame = 0;//хранит текущий кадр
 	while (window.isOpen())
 	{
+		std::list<Entity*>::iterator at;//второй итератор.для взаимодействия между объектами списка
 		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
 		Vector2f pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
 		float time = clock.getElapsedTime().asMicroseconds();
@@ -295,6 +388,9 @@ int main()
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
+			if (event.key.code == Mouse::Left) {
+				entities.push_back(new Bullet(bulletImage, lvl, p.x, p.y, 23, 7, pos.x, pos.y, "Bullet"));
+			}
 		}
 		p.rotation_GG(pos);
 		p.update(time);// Player update function
@@ -307,6 +403,12 @@ int main()
 		}
 		for (it = entities.begin(); it != entities.end(); it++)//проходимся по эл-там списка
 		{
+			for (at = entities.begin(); at != entities.end(); at++) {
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "Bullet") && ((*it)->name == "easyEnemy"))) {
+					(*it)->health -= 13;
+					(*at)->life = false;
+				}
+			}
 			if ((*it)->getRect().intersects(p.getRect()))//если прямоугольник спрайта объекта пересекается с игроком
 			{
 				if ((*it)->name == "easyEnemy") {//и при этом имя объекта EasyEnemy,то..
