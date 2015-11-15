@@ -33,10 +33,10 @@ public:
 		gunSprite.setTexture(gunTexture);
 		sprite.setOrigin(w / 2, h / 2);
 	}
-	virtual void update(float time) = 0;
 	FloatRect getRect() {//ф-ци€ получени€ пр€моугольника. его коорд,размеры (шир,высот).
 		return FloatRect(x, y, w, h);//эта ф-ци€ нужна дл€ проверки столкновений 
 	}
+	virtual void update(float time) = 0;
 };
 class Player :public Entity {
 public:
@@ -109,6 +109,7 @@ public:
 		checkCollisionWithMap(0, dy);//обрабатываем столкновение по Y
 		sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
 		gunSprite.setPosition(x + w / 2, y + h / 2);
+
 		if (health <= 0) { life = false; }
 		if (!isMove) { speed = 0; }
 		if (life) { getPlayerCoordinateForView(x, y); }
@@ -118,7 +119,7 @@ class Enemy :public Entity {
 public:
 	Enemy(Image &image, Image &gunImage, Level &lvl, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, gunImage, X, Y, W, H, Wgun, Hgun, Name) {
 		obj = lvl.GetObjects("solid");
-		if (name == "EasyEnemy") {
+		if (name == "easyEnemy") {
 			sprite.setTextureRect(IntRect(0, 0, w, h));
 			dx = -0.1;//даем скорость.этот объект всегда двигаетс€
 			dy = -0.1;
@@ -140,7 +141,7 @@ public:
 	}
 
 	void update(float time){
-		if (name == "EasyEnemy") {//дл€ персонажа с таким именем логика будет такой
+		if (name == "easyEnemy") {//дл€ персонажа с таким именем логика будет такой
 			checkCollisionWithMap(dx, dy);//обрабатываем столкновение по ’
 			x += dx*time;
 			y += dy*time;
@@ -275,7 +276,7 @@ int main()
 	Clock clock;
 
 	for (int i = 0; i < e.size(); i++)//проходимс€ по элементам этого вектора(а именно по врагам)
-		entities.push_back(new Enemy(easyEnemyImage, gunImage, lvl, e[i].rect.left, e[i].rect.top, 43, 75, 0, 0, "EasyEnemy"));//и закидываем в список всех наших врагов с карты
+		entities.push_back(new Enemy(easyEnemyImage, gunImage, lvl, e[i].rect.left, e[i].rect.top, 43, 75, 0, 0, "easyEnemy"));//и закидываем в список всех наших врагов с карты
 
 	//Enemy easyEnemy(easyEnemyImage, gunImage, lvl, easyEnemyObject.rect.left, easyEnemyObject.rect.top, 43, 75, 0, 0, "EasyEnemy");
 	bool ret = false;
@@ -296,8 +297,27 @@ int main()
 				window.close();
 		}
 		p.rotation_GG(pos);
-		p.update(time);// Player update function	
-		for (it = entities.begin(); it != entities.end(); it++) { (*it)->update(time); }//дл€ всех элементов списка(пока это только враги,но могут быть и пули к примеру) активируем ф-цию update
+		p.update(time);// Player update function
+		for (it = entities.begin(); it != entities.end();)//говорим что проходимс€ от начала до конца
+		{
+			Entity *b = *it;//дл€ удобства, чтобы не писать (*it)->
+			b->update(time);//вызываем ф-цию update дл€ всех объектов (по сути дл€ тех, кто жив)
+			if (b->life == false) { it = entities.erase(it); delete b; }// если этот объект мертв, то удал€ем его
+			else it++;//и идем курсором (итератором) к след объекту. так делаем со всеми объектами списка
+		}
+		for (it = entities.begin(); it != entities.end(); it++)//проходимс€ по эл-там списка
+		{
+			if ((*it)->getRect().intersects(p.getRect()))//если пр€моугольник спрайта объекта пересекаетс€ с игроком
+			{
+				if ((*it)->name == "easyEnemy") {//и при этом им€ объекта EasyEnemy,то..
+					(*it)->dx = 0;
+					p.health -= 1;
+				}
+			}
+		}
+		if (!p.life)
+			window.close();
+		//for (it = entities.begin(); it != entities.end(); it++) { (*it)->update(time); }//дл€ всех элементов списка(пока это только враги,но могут быть и пули к примеру) активируем ф-цию update
 		window.setView(view);
 		window.clear();
 		lvl.Draw(window);//рисуем новую карту
