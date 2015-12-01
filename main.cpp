@@ -1,6 +1,6 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <iostream> 
-//#include "map.h"
 #include "view.h"
 #include "TinyXML\tinyxml.h"
 #include "level.h"
@@ -18,14 +18,16 @@ class Entity {
 public:
 	std::vector<Object> obj;//вектор объектов карты
 	float dx, dy, x, y, speed, moveTimer;//добавили переменную таймер для будущих целей
-	int w, h, health;
+	int w, h, health, armor, wGun, hGun;
 	bool life, isMove, isSelect;
+	int damage;
+	float enemyShot;
 	Texture texture, gunTexture;
 	Sprite sprite, gunSprite;
 	String name;//враги могут быть разные, мы не будем делать другой класс для врага.всего лишь различим врагов по имени и дадим каждому свое действие в update в зависимости от имени
 	Entity(Image &image, float X, float Y, int W, int H, String Name) {
 		x = X; y = Y; w = W; h = H; name = Name; moveTimer = 0;
-		speed = 0; health = 100; dx = 0; dy = 0;
+		speed = 0; dx = 0; dy = 0;
 		life = true; isMove = false;
 		texture.loadFromImage(image);
 		sprite.setTexture(texture);
@@ -34,22 +36,26 @@ public:
 	FloatRect getRect() {//ф-ция получения прямоугольника. его коорд,размеры (шир,высот).
 		return FloatRect(x, y, w, h);//эта ф-ция нужна для проверки столкновений 
 	}
-	virtual void update(float time) = 0;
+	virtual void update(float time, float coordX, float coordY) = 0;
 };
 
 class Player :public Entity {
 public:
+	float CurrentFrame;
 	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
+	int weapon, ammo;
 	float rotation;
+	bool gameover = false;
 	int playerScore;//эта переменная может быть только у игрока
 	Player(Image &image, Image &gunImage, Level &lev, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, X, Y, W, H, Name) {
+		health = 100; armor = 150; weapon = 1; weapon = 1;
 		playerScore = 0; state = stay; isSelect = false; obj = lev.GetAllObjects();
 		gunTexture.loadFromImage(gunImage);
 		gunSprite.setTexture(gunTexture);
 		if (name == "Player") {
 			sprite.setTextureRect(IntRect(0, 0, w, h));
-			gunSprite.setTextureRect(IntRect(0, 0, Wgun, Hgun));
 		}
+		select_weapon(weapon);
 	}
 
 	void control() {
@@ -95,6 +101,28 @@ public:
 		float dY = pos.y - y;//он же, координата y
 		rotation = (atan2(dY, dX)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
 	}
+	void select_weapon(int wp) {
+		if (wp == 0) {
+			gunSprite.setTextureRect(IntRect(0, 0, 72, 15));
+			ammo = 100;
+			damage = 5;
+		}
+		else if (wp == 1) {
+			ammo = 4;
+			damage = 30;
+			gunSprite.setTextureRect(IntRect(0, 15, 72, 15));
+		}
+		else if (wp == 2) {
+			ammo = 30;
+			damage = 15;
+			gunSprite.setTextureRect(IntRect(0, 30, 72, 15));
+		}
+		else if (wp == 3) {
+			ammo = 10;
+			damage = 50;
+			gunSprite.setTextureRect(IntRect(0, 45, 72, 15));
+		}
+	}
 	void checkCollisionWithMap(float Dx, float Dy)//ф ция проверки столкновений с картой
 	{
 		for (int i = 0; i<obj.size(); i++)//проходимся по объектам
@@ -107,11 +135,17 @@ public:
 					if (Dx>0) { x = obj[i].rect.left - w; }
 					if (Dx<0) { x = obj[i].rect.left + obj[i].rect.width; }
 				}
+				if (obj[i].name == "exit"){//если встретили препятствие
+					gameover = true;
+				}
 			}
+		
 	}
 
-	void update(float time)
-	{
+	void update(float time, float coordX, float coordY){
+		CurrentFrame += 0.005*time;
+		if (CurrentFrame > 4) CurrentFrame -= 4;
+		sprite.setTextureRect(IntRect(0, h * int(CurrentFrame), w, h));
 		sprite.setRotation(rotation);//поворачиваем спрайт на эти градусы
 		gunSprite.setRotation(rotation);
 		control();//функция управления персонажем
@@ -142,12 +176,26 @@ public:
 
 class Enemy :public Entity {
 public:
+	float CurrentFrame;
+	float rotation;
 	Enemy(Image &image, Image &gunImage, Level &lvl, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, X, Y, W, H, Name) {
 		obj = lvl.GetObjects("solid");
+		w = W; h = H; wGun = Wgun; hGun = Hgun;
+		gunTexture.loadFromImage(gunImage);
+		gunSprite.setTexture(gunTexture);
+		enemyShot = 0;
 		if (name == "easyEnemy") {
+			speed = 1; health = 50; armor = 0; damage = 1;
 			sprite.setTextureRect(IntRect(0, 0, w, h));
-			dx = -0.1;//даем скорость.этот объект всегда двигается
-			//dy = -0.1;
+		}
+		if (name == "mediumEnemy") {
+			speed = 2; health = 100; armor = 0; damage = 2;
+			sprite.setTextureRect(IntRect(0, 0, w, h));
+		}
+		if (name == "bandit") {
+			speed = 3; health = 100; armor = 100; damage = 15;
+			sprite.setTextureRect(IntRect(0, 0, w, h));
+			gunSprite.setTextureRect(IntRect(0, 30, wGun, hGun));
 		}
 	}
 
@@ -157,33 +205,114 @@ public:
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (Dy>0) { y = obj[i].rect.top - h;  dy = -0.1; }
-					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0.1; }
-					if (Dx > 0) { x = obj[i].rect.left - w; dx = -0.1; }
-					if (Dx < 0) { x = obj[i].rect.left + obj[i].rect.width; dx = 0.1; }
+					if (Dy>0) { y -= 10; }
+					if (Dy<0) { y += 10;}
+					if (Dx > 0) { x -= 10;}
+					if (Dx < 0) { x += 10;}
 				}
 			}
 	}
 
-	void update(float time){
+	void update(float time, float posPlayerX, float posPlayerY){
 		if (name == "easyEnemy") {//для персонажа с таким именем логика будет такой
+			dx = posPlayerX - x;
+			dy = posPlayerY - y;
+			if (dx > 0) {
+				x += speed;
+			}
+			else if (dx < 0)
+				x -= speed;
+			if (dy > 0) {
+				y += speed;
+			}
+			else if (dy < 0)
+				y -= speed;
+			rotation = (atan2(dx, dy)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
 			checkCollisionWithMap(dx, dy);//обрабатываем столкновение по Х
-			x += dx*time;
-			y += dy*time;
+			//x += speed * (dx);
+			//y += speed * (dy);
+			sprite.setRotation(-rotation);
 			sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+			if (health <= 0) { life = false; }
+		}
+		if (name == "mediumEnemy") {
+			dx = posPlayerX - x;
+			dy = posPlayerY - y;
+			if (dx > 0) {
+				x += speed;
+			}
+			else if (dx < 0)
+				x -= speed;
+			if (dy > 0) {
+				y += speed;
+			}
+			else if (dy < 0)
+				y -= speed;
+			rotation = (atan2(dx, dy)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
+			checkCollisionWithMap(dx, dy);//обрабатываем столкновение по Х
+			//x += speed * (posPlayerX - x);
+			//y += speed * (posPlayerY - y);
+			sprite.setRotation(-rotation);
+			sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+			if (health <= 0) { life = false; }
+		}
+		if (name == "bandit") {
+			dx = posPlayerX - x;
+			dy = posPlayerY - y;
+			if (dx > 0 && dx > 500) {
+				x += speed;
+			}
+			else if (dx < 0 && dx < -500)
+				x -= speed;
+			if (dy > 0 && dy > 300) {
+				y += speed;
+			}
+			else if (dy < 0 && dy < -300)
+				y -= speed;
+			rotation = (atan2(dx, dy)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
+			checkCollisionWithMap(dx, dy);//обрабатываем столкновение по Х
+										  //x += speed * (posPlayerX - x);
+										  //y += speed * (posPlayerY - y);
+			sprite.setRotation(-rotation + 90);
+			gunSprite.setRotation(-rotation + 90);
+			sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+			gunSprite.setPosition(x + w / 2, y + h / 2);
 			if (health <= 0) { life = false; }
 		}
 	}
 };
-
+class Equip : public Entity {
+public:
+	Equip(Image &image, float X, float Y, int W, int H, String Name):Entity(image, X, Y, W, H, Name) {
+		x = X; y = Y;
+		w = W; h = H;
+		if (Name == "machineGun") {
+			sprite.setTextureRect(IntRect(0, 0, w, h));
+		}
+		else if (Name == "shotgun") {
+			sprite.setTextureRect(IntRect(0, 40, w, h));
+		}
+		else if(Name == "automatical") {
+			sprite.setTextureRect(IntRect(0, 20, w, h));
+		}
+		else if (Name == "rifle") {
+			sprite.setTextureRect(IntRect(0, 55, w, h));
+		}
+	}
+	void update(float time, float coordX, float coordY) {
+		sprite.setPosition(x, y);
+	}
+};
 class Bullet :public Entity {//класс пули
 public:
-	int direction;//направление пули
+	int direction, numBull;//направление пули
 	float tempy, tempx, rotation, Dx, Dy;
-	Bullet(Image &image, Level &lvl, float X, float Y, int W, int H, float tempX, float tempY, String Name) :Entity(image, X, Y, W, H, Name) {//всё так же, только взяли в конце состояние игрока (int dir)
+	Bullet(Image &image, Level &lvl, float X, float Y, int W, int H, float tempX, float tempY, String Name, int damag, int numBullet) :Entity(image, X, Y, W, H, Name) {//всё так же, только взяли в конце состояние игрока (int dir)
+		numBull = numBullet;
 		obj = lvl.GetObjects("solid");//инициализируем .получаем нужные объекты для взаимодействия пули с картой
 		x = X;
 		y = Y;
+		damage = damag;
 		speed = 0.1;
 		tempx = tempX;
 		tempy = tempY;
@@ -196,36 +325,10 @@ public:
 		Dx = tempx - x;
 		Dy = tempy - y;
 		rotation = (atan2(Dy, Dx)) * 180 / 3.14159265;//получаем угол в радианах и переводим его в градусы
-		//выше инициализация в конструкторе
 	}
-
-
-	void update(float time)
-	{
-		x += speed * (tempx - dx);//???? ?? ???? ? ??????? ??????? ???????
-		y += speed * (tempy - dy);//???? ?? ?????? ??? ??
-
-		if (x <= 0) x = 1;// ???????? ???? ? ????? ?????, ????? ??? ?????????? ?????? ??? ???????? ?? ???????? ?? ?????? ????? ? ?? ???? ??????
-		if (y <= 0) y = 1;
-
-		for (int i = 0; i < obj.size(); i++) {//?????? ?? ???????? solid
-			if (getRect().intersects(obj[i].rect)) //???? ???? ?????? ?????????? ? ?????,
-			{
-				life = false;// ?? ???? ???????
-			}
-		}
-		/*switch (direction)
-		{
-		case 0: dx = -speed; dy = 0;   break;//интовое значение state = left
-		case 1: dx = speed; dy = 0;   break;//интовое значение state = right
-		case 2: dx = 0; dy = -speed;   break;//интовое значение state = up
-		case 3: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
-		case 4: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
-		case 5: dx = 0; dy = -speed;   break;//интовое значение не имеющее отношения к направлению, пока просто стрельнем вверх, нам сейчас это не важно
-		}
-
-		x += dx*time;//само движение пули по х
-		y += dy*time;//по у
+	void update(float time, float coordX, float coordY){
+		x += speed * (tempx - dx);
+		y += speed * (tempy - dy);
 
 		if (x <= 0) x = 1;// задержка пули в левой стене, чтобы при проседании кадров она случайно не вылетела за предел карты и не было ошибки
 		if (y <= 0) y = 1;
@@ -235,112 +338,48 @@ public:
 			{
 				life = false;// то пуля умирает
 			}
-		}*/
+		}
 		sprite.setRotation(rotation);
-		sprite.setPosition(x + w / 2, y + h / 2);//задается позицию пуле
+		sprite.setPosition(x + w / 2 + numBull * 10, y + h / 2 + numBull * 10);//задается позицию пуле
 	}
 };
 
-/*void interactionWithMap(player &p)//ф-ция взаимодействия с картой
-{
-	for (int i = p.y / 53; i < (p.y + p.h) / 53; i++)//проходимся по всей карте, то есть по всем квадратикам размера 32*32, которые мы окрашивали в 9 уроке. про условия читайте ниже.
-		for (int j = p.x / 54; j < (p.x + p.w) / 54; j++)//икс делим на 32, тем самым получаем левый квадратик, с которым персонаж соприкасается. (он ведь больше размера 32*32, поэтому может одновременно стоять на нескольких квадратах). А j<(x + w) / 32 - условие ограничения координат по иксу. то есть координата самого правого квадрата, который соприкасается с персонажем. таким образом идем в цикле слева направо по иксу, проходя по от левого квадрата (соприкасающегося с героем), до правого квадрата (соприкасающегося с героем)
-		{
-			if (TileMap[i][j] == '1')//если наш квадратик соответствует символу 0 (стена), то проверяем "направление скорости" персонажа:
-			{
-				if (p.dy > 0)//если мы шли вниз,
-				{
-					p.y = i * 50 - 1;//то стопорим координату игрек персонажа. сначала получаем координату нашего квадратика на карте(стены) и затем вычитаем из высоты спрайта персонажа.
-				}
-				if (p.dy < 0)
-				{
-					p.y = i * 50 + 100;//аналогично с ходьбой вверх. dy<0, значит мы идем вверх (вспоминаем координаты паинта)
-				}
-				if (p.dx > 0)
-				{
-					p.x = j * 50 - 1;//если идем вправо, то координата Х равна стена (символ 0) минус ширина персонажа
-				}
-				if (p.dx < 0)
-				{
-					p.x = j * 50 + 100;//аналогично идем влево
-				}
-			}
-			if (TileMap[i][j] == 'e') {
-				p.health -= 40;//если взяли ядовитейший в мире цветок,то переменная health=health-40;
-				TileMap[i][j] = '0';//убрали цветок
-			}
-		}
-}*/
 
-/*void player_control(player &p, float time, Sprite &hero, Sprite &gun) //функция "оживления" объекта класса. update - обновление. принимает в себя время SFML , вследствие чего работает бесконечно, давая персонажу движение.
-{
-	if (p.dir == 0)//реализуем поведение в зависимости от направления. (каждая цифра соответствует направлению)
-	{
-		p.dx = p.speed; p.dy = 0;
-	}//вправо
-	if (p.dir == 1)
-	{
-		p.dx = -p.speed; p.dy = 0;
-	}//влево
-	if (p.dir == 2)
-	{
-		p.dx = 0; p.dy = p.speed;
-	}//вниз
-	if (p.dir == 3)
-	{
-		p.dx = 0; p.dy = -p.speed;
-	}//вверх
-	p.x += p.dx*time;//то движение из прошлого урока. наше ускорение на время получаем смещение координат и как следствие движение
-	p.y += p.dy*time;//аналогично по игреку
-	p.speed = 0;//зануляем скорость, чтобы персонаж остановился.
-	interactionWithMap(p);//вызываем функцию, отвечающую за взаимодействие с картой
-	hero.setPosition(p.x, p.y); //выводим спрайт в позицию x y , посередине. бесконечно выводим в этой функции, иначе бы наш спрайт стоял на месте.
-	gun.setPosition(p.x, p.y);
-	if (p.health <= 0) { p.life = false; p.speed = 0; }//если жизней меньше либо равно 0, то умираем и исключаем движение игрока после смерти
-}*/
+int main() {
+	float queueShot = 0, enemyShot = 0;
+	Music music;
+	//music.openFromFile("sounds/mus01.ogg");// тут загружаем в буфер что то
+	music.play();
 
-/*void move_player(float rotation, float time, player &p, float &CurrentFrame, Sprite &hero, Sprite &gun) {
-	bool press = false;
-	hero.setRotation(rotation);//поворачиваем спрайт на эти градусы
-	gun.setRotation(rotation);
-	if ((Keyboard::isKeyPressed(Keyboard::Left) || (Keyboard::isKeyPressed(Keyboard::A)))) {
-		press = true;
-		p.dir = 1; p.speed = 0.2; p.dir2 = -1;//dir =1 - направление вверх, speed =0.1 - скорость движения. Заметьте - время мы уже здесь ни на что не умножаем и нигде не используем каждый раз
-	}
+	sf::Vector2f posView;
 
-	if ((Keyboard::isKeyPressed(Keyboard::Right) || (Keyboard::isKeyPressed(Keyboard::D)))) {
-		if (press == true)
-			p.dir2 = 0;
-		else {
-			press = true;
-			p.dir = 0; p.speed = 0.2;p.dir2 = -1;//направление вправо, см выше
-		}
-	}
+	SoundBuffer machineBuffer;//создаём буфер для звука
+	machineBuffer.loadFromFile("sounds/MachineGun.wav");//загружаем в него звук
+	Sound shootMachine(machineBuffer);//создаем звук и загружаем в него звук из буфера
+	
+	SoundBuffer damageBuffer;//создаём буфер для звука
+	damageBuffer.loadFromFile("sounds/ZombieAttack1.wav");//загружаем в него звук
+	Sound damage(damageBuffer);//создаем звук и загружаем в него звук из буфера
 
-	if ((Keyboard::isKeyPressed(Keyboard::Up) || (Keyboard::isKeyPressed(Keyboard::W)))) {
-		if (press == true)
-			p.dir2 = 3;
-		else {
-			press = true;
-			p.dir = 3; p.speed = 0.2; p.dir2 = -1;//направление вправо, см выше
-		}
-	}
+	SoundBuffer shotgunBuffer;//создаём буфер для звука
+	shotgunBuffer.loadFromFile("sounds/PumpShotgun.wav");//загружаем в него звук
+	Sound shootShootGun(shotgunBuffer);//создаем звук и загружаем в него звук из буфера
 
-	if ((Keyboard::isKeyPressed(Keyboard::Down) || (Keyboard::isKeyPressed(Keyboard::S)))) { //если нажата клавиша стрелка влево или англ буква А
-		if (press == true)
-			p.dir2 = 2;
-		else {
-			press = true;
-			p.dir = 2; p.speed = 0.2; p.dir2 = -1;//направление вправо, см выше
-		}
-	}
-	CurrentFrame += 0.005*time;
-	if (CurrentFrame > 4) CurrentFrame -= 4;
-	hero.setTextureRect(IntRect(0, p.h * int(CurrentFrame), p.w, p.h)); //через объект p класса player меняем спрайт, делая анимацию (используя оператор точку)
-	getplayercoordinateforview(p.x, p.y);//передаем координаты игрока в функцию управления камеро
-}*/
+	SoundBuffer rifleBuffer;//создаём буфер для звука
+	rifleBuffer.loadFromFile("sounds/Rifle.wav");//загружаем в него звук
+	Sound shootRifle(rifleBuffer);//создаем звук и загружаем в него звук из буфера
 
-int main(){
+	SoundBuffer reloadBuffer;//создаём буфер для звука
+	reloadBuffer.loadFromFile("sounds/Reload.wav");//загружаем в него звук
+	Sound shootReload(reloadBuffer);//создаем звук и загружаем в него звук из буфера
+
+	int HP;
+	String strHP;
+	Font font;//шрифт 
+	font.loadFromFile("images/Albionic.ttf");//передаем нашему шрифту файл шрифта
+	Text text("", font, 40);//создаем объект текст. закидываем в объект текст строку, шрифт, размер шрифта(в пикселях);//сам объект текст (не строка)
+	text.setColor(Color::Red);//покрасили текст в красный. если убрать эту строку, то по умолчанию он белый
+
 	int tempX = 0;//временная коорд Х.Снимаем ее после нажатия прав клав мыши
 	int tempY = 0;//коорд Y
 	float distance = 0;//это расстояние от объекта до тыка курсора
@@ -351,86 +390,256 @@ int main(){
 	lvl.LoadFromFile("map.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
 
 	Object player = lvl.GetObject("player");//объект игрока на нашей карте.задаем координаты игроку в начале при помощи него
-	
+
 	std::list<Entity*>  entities;//создаю список, сюда буду кидать объекты.например врагов.
 	std::list<Entity*>::iterator it;//итератор чтобы проходить по эл-там списка
 
-	std::vector<Object> e = lvl.GetObjects("easyEnemy");//все объекты врага на tmx карте хранятся в этом векторе
+	std::vector<Object> easyE = lvl.GetObjects("easyEnemy");//все объекты врага на tmx карте хранятся в этом векторе
+	std::vector<Object> medE = lvl.GetObjects("mediumEnemy");
+	std::vector<Object> bandE = lvl.GetObjects("bandit");
+	std::vector<Object> shotgun = lvl.GetObjects("shotgun");
+	std::vector<Object> machineGun = lvl.GetObjects("machineGun");
+	std::vector<Object> rifle = lvl.GetObjects("rifle");
+	std::vector<Object> automatical = lvl.GetObjects("automatical");
 
-
-	Image heroImage, gunImage, easyEnemyImage, bulletImage;
+	Image heroImage, gunImage, easyEnemyImage, bulletImage, mediumEnemyImage, equipImage, banditImage;
 	bulletImage.loadFromFile("images/shot.png");
 	heroImage.loadFromFile("images/players_anim.png");
-	gunImage.loadFromFile("images/weapon.png");
+	gunImage.loadFromFile("images/weapons.png");
+	equipImage.loadFromFile("images/equipment2.png");
 	easyEnemyImage.loadFromFile("images/easy_enemy.png");
-	std::cout << player.rect.left << player.rect.top;
-	Player p(heroImage, gunImage, lvl, player.rect.left, player.rect.top, 91, 54, 72, 20, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
+	banditImage.loadFromFile("images/bandit.png");
+	mediumEnemyImage.loadFromFile("images/MediumEnemy.png");
+
+	Player p(heroImage, gunImage, lvl, player.rect.left, player.rect.top, 91, 54, 72, 15, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
 	Clock clock;
-
-	for (int i = 0; i < e.size(); i++)//проходимся по элементам этого вектора(а именно по врагам)
-		entities.push_back(new Enemy(easyEnemyImage, gunImage, lvl, e[i].rect.left, e[i].rect.top, 43, 75, 0, 0, "easyEnemy"));//и закидываем в список всех наших врагов с карты
-
-	//Enemy easyEnemy(easyEnemyImage, gunImage, lvl, easyEnemyObject.rect.left, easyEnemyObject.rect.top, 43, 75, 0, 0, "EasyEnemy");
+	Clock gameTime;
+	for (int i = 0; i < easyE.size(); i++) //проходимся по элементам этого вектора(а именно по врагам)
+		entities.push_back(new Enemy(easyEnemyImage, gunImage, lvl, easyE[i].rect.left, easyE[i].rect.top, 43, 75, 0, 0, "easyEnemy"));//и закидываем в список всех наших врагов с карты
+	for (int i = 0; i < medE.size(); i++)
+		entities.push_back(new Enemy(mediumEnemyImage, gunImage, lvl, medE[i].rect.left, medE[i].rect.top, 76, 44, 0, 0, "mediumEnemy"));
+	for (int i = 0; i < bandE.size(); i++) //проходимся по элементам этого вектора(а именно по врагам)
+		entities.push_back(new Enemy(banditImage, gunImage, lvl, easyE[i].rect.left, easyE[i].rect.top, 104, 56, 72, 15, "bandit"));//и закидываем в список всех наших врагов с карты
+	for (int i = 0; i < machineGun.size(); i++)
+		entities.push_back(new Equip(equipImage, machineGun[i].rect.left, machineGun[i].rect.top, 80, 20, "machineGun"));
+	for (int i = 0; i < shotgun.size(); i++)
+		entities.push_back(new Equip(equipImage, shotgun[i].rect.left, shotgun[i].rect.top, 80, 15, "shotgun"));
+	for (int i = 0; i < automatical.size(); i++)
+		entities.push_back(new Equip(equipImage, automatical[i].rect.left, automatical[i].rect.top, 80, 20, "automatical"));
+	for (int i = 0; i < rifle.size(); i++)
+		entities.push_back(new Equip(equipImage, rifle[i].rect.left, rifle[i].rect.top, 80, 13, "rifle"));
 	bool ret = false;
 
 	float CurrentFrame = 0;//хранит текущий кадр
-	while (window.isOpen())
-	{
+	while (window.isOpen()){
 		std::list<Entity*>::iterator at;//второй итератор.для взаимодействия между объектами списка
 		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
 		Vector2f pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
 		float time = clock.getElapsedTime().asMicroseconds();
-
+		float timeGame = gameTime.getElapsedTime().asSeconds();
 		clock.restart();
-		time = time / 800;
+		time = time / 700;
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
-			if (event.key.code == Mouse::Left) {
-				entities.push_back(new Bullet(bulletImage, lvl, p.x, p.y, 23, 7, pos.x, pos.y, "Bullet"));
+			if (event.key.code == Mouse::Left && p.weapon == 0 && p.ammo > 0) {
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 0));
+				p.ammo -= 1;
+				shootMachine.play();
 			}
+			else if (event.key.code == Mouse::Left && p.weapon == 1 && p.ammo > 0 && timeGame > queueShot) {
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 0));
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 1));
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 2));
+				p.ammo -= 1;
+				queueShot = timeGame + 2;
+				shootShootGun.play();
+			}
+			else if (event.key.code == Mouse::Left && p.weapon == 2 && p.ammo > 0 && timeGame > queueShot) {
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 0));
+				p.ammo -= 1;
+				queueShot = timeGame + 0.25;
+				shootMachine.play();
+			}
+			else if (event.key.code == Mouse::Left && p.weapon == 3 && p.ammo > 0 && timeGame > queueShot) {
+				entities.push_back(new Bullet(bulletImage, lvl, p.x + p.w / 2, p.y + p.h / 2, 23, 7, pos.x, pos.y, "Bullet", p.damage, 0));
+				p.ammo -= 1;
+				queueShot = timeGame + 5;
+				shootRifle.play();
+			}
+			else if (event.key.code == Mouse::Left)
+				shootReload.play();
 		}
 		p.rotation_GG(pos);
-		p.update(time);// Player update function
+		if (p.life)
+			p.update(time, p.x, p.y);// Player update function
 		for (it = entities.begin(); it != entities.end();)//говорим что проходимся от начала до конца
 		{
 			Entity *b = *it;//для удобства, чтобы не писать (*it)->
-			b->update(time);//вызываем ф-цию update для всех объектов (по сути для тех, кто жив)
+			b->update(time, p.x, p.y);//вызываем ф-цию update для всех объектов (по сути для тех, кто жив)
 			if (b->life == false) { it = entities.erase(it); delete b; }// если этот объект мертв, то удаляем его
 			else it++;//и идем курсором (итератором) к след объекту. так делаем со всеми объектами списка
 		}
 		for (it = entities.begin(); it != entities.end(); it++)//проходимся по эл-там списка
 		{
+			if ((*it)->name == "bandit" && ((*it)->dx <= 500 || (*it)->dx <= -500) && ((*it)->dy < 300 || (*it)->dy < 300) && (*it)->enemyShot < timeGame) { //проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
+				entities.push_back(new Bullet(bulletImage, lvl, (*it)->x + (*it)->w / 2, (*it)->y + (*it)->h / 2, 23, 7, p.x, p.y, "enemyBullet", (*it)->damage, 0));
+				(*it)->enemyShot = timeGame + 1;
+			}
 			for (at = entities.begin(); at != entities.end(); at++) {
 				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "Bullet") && ((*it)->name == "easyEnemy"))) {
-					(*it)->health -= 13;
+					(*it)->health -= (*at)->damage;
 					(*at)->life = false;
 				}
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "Bullet") && ((*it)->name == "mediumEnemy"))) {
+					(*it)->health -= (*at)->damage;
+					(*at)->life = false;
+				}
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "easyEnemy") && ((*it)->name == "easyEnemy"))) {
+					(*it)->x -= 5;
+					(*it)->y -= 5;
+					(*at)->x += 5;
+					(*at)->y += 5;
+				}
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "easyEnemy") && ((*it)->name == "mediumEnemy"))) {
+					(*it)->x -= 5;
+					(*it)->y -= 5;
+					(*at)->x += 5;
+					(*at)->y += 5;
+				}
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "bandit") && ((*it)->name == "bandit"))) {
+					(*it)->x -= 5;
+					(*it)->y -= 5;
+					(*at)->x += 5;
+					(*at)->y += 5;
+				}
+				if ((*it)->getRect().intersects((*at)->getRect()) && (((*at)->name == "mediumEnemy") && ((*it)->name == "mediumEnemy"))) {
+					if ((*it)->x > (*at)->x) {
+						(*it)->x -= 5;
+						(*at)->x += 5;
+					}
+					else {
+						(*it)->x += 5;
+						(*at)->x -= 5;
+					}
+					if ((*it)->y > (*at)->x) {
+						(*it)->y += 5;
+						(*at)->y -= 5;
+					}
+					else {
+						(*it)->y -= 5;
+						(*at)->y += 5;
+					}
+
+				}
 			}
-			if ((*it)->getRect().intersects(p.getRect()))//если прямоугольник спрайта объекта пересекается с игроком
-			{
+			if ((*it)->getRect().intersects(p.getRect())){//если прямоугольник спрайта объекта пересекается с игроком
 				if ((*it)->name == "easyEnemy") {//и при этом имя объекта EasyEnemy,то..
-					(*it)->dx = 0;
-					p.health -= 1;
+					if ((*it)->x > p.x)
+						(*it)->x -= 15;
+					else
+						(*it)->x += 15;
+					if ((*it)->y > p.y)
+						(*it)->y += 15;
+					else
+						(*it)->y -= 15;
+					if (p.armor > 0)
+						p.armor -= (*it)->damage;
+					else
+						p.health -= (*it)->damage;
+					damage.play();
+				}
+				if ((*it)->name == "mediumEnemy") {//и при этом имя объекта EasyEnemy,то..
+					if ((*it)->x > p.x)
+						(*it)->x += 15;
+					else
+						(*it)->x -= 15;
+					if ((*it)->y > p.y)
+						(*it)->y += 15;
+					else
+						(*it)->y -= 15;
+					if (p.armor > 0)
+						p.armor -= (*it)->damage;
+					else
+						p.health -= (*it)->damage;
+					damage.play();
+				}
+				if ((*it)->name == "enemyBullet") {
+					if (p.armor > 0)
+						p.armor -= (*it)->damage;
+					else
+						p.health -= (*it)->damage;
+					(*it)->life = false;
+				}
+				if ((*it)->name == "machineGun") {
+					p.weapon = 0;
+					p.select_weapon(p.weapon);
+					(*it)->life = false;
+				}
+				if ((*it)->name == "shotgun") {
+					p.weapon = 1;
+					p.select_weapon(p.weapon);
+					(*it)->life = false;
+				}
+				if ((*it)->name == "automatical") {
+					p.weapon = 2;
+					p.select_weapon(p.weapon);
+					(*it)->life = false;
+				}
+				if ((*it)->name == "rifle") {
+					p.weapon = 3;
+					p.select_weapon(p.weapon);
+					(*it)->life = false;
 				}
 			}
 		}
-		if (!p.life)
-			window.close();
-		//for (it = entities.begin(); it != entities.end(); it++) { (*it)->update(time); }//для всех элементов списка(пока это только враги,но могут быть и пули к примеру) активируем ф-цию update
 		window.setView(view);
 		window.clear();
+		posView = view.getCenter();
 		lvl.Draw(window);//рисуем новую карту
 		for (it = entities.begin(); it != entities.end(); it++) {
-			window.draw((*it)->sprite); //рисуем entities объекты (сейчас это только враги)
+			if ((*it)->x > posView.x - 632 && (*it)->x < posView.x + 632 && (*it)->y > posView.y - 384 && (*it)->y < posView.y + 384) // если объект выходит за экран, не рисуем
+				window.draw((*it)->gunSprite);
+				window.draw((*it)->sprite); //рисуем entities объекты (сейчас это только враги)
 		}
-		//window.draw(easyEnemy.sprite);
 		window.draw(p.gunSprite);
 		window.draw(p.sprite);
-		window.display();
-	}
+		if (!p.life) {
+			text.setPosition(posView.x - 100, posView.y - 50);//задаем позицию текста, центр камеры
+			text.setColor(Color::Red);
+			text.setString("GAME OVER");//задает строку тексту
+			window.draw(text);//рисую этот текст
+		}
+		else {
+			text.setPosition(posView.x - 610, posView.y + 290);//задаем позицию текста, слева внизу
+			text.setColor(Color::Red);
+			HP = p.health;
+			strHP = std::to_string(HP);
+			text.setString(strHP);//задает строку тексту
+			window.draw(text);//рисую этот текст
+			
+			if (p.armor > 0) {
+				text.setPosition(posView.x - 530, posView.y + 290);//задаем позицию текста, слева внизу
+				text.setColor(Color::Blue); // броня
+				HP = p.armor;
+				strHP = std::to_string(HP);
+				text.setString(strHP);//задает строку тексту
+				window.draw(text);//рисую этот текст]
+			}
 
+			text.setPosition(posView.x + 500, posView.y + 290);//задаем позицию текста, слева внизу
+			text.setColor(Color::Cyan); // броня
+			HP = p.ammo;
+			strHP = std::to_string(HP);
+			text.setString(strHP);//задает строку тексту
+			window.draw(text);//рисую этот текст
+		}
+		if (p.gameover) {
+			window.close();
+		}
+		window.display(); 
+	}
 	return 0;
 }
