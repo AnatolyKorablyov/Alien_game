@@ -13,16 +13,13 @@ public:
 	float rotation;
 	bool gameover = false;
 	int playerScore;
-	Player(Image &image, Image &gunImage, Level &lev, Vector2f coords, FloatRect sizeHeros, Vector2f sizeGuns, String Name) :Entity(image, coords, sizeHeros, Name) {
-		coord = coords;
-		sizeHero = sizeHeros;
-		sizeGun = sizeGuns;
+	Player(Image &image, Image &gunImage, Level &lev, float X, float Y, int W, int H, int Wgun, int Hgun, String Name) :Entity(image, X, Y, W, H, Name) {
 		health = 100; armor = 100; weapon = 1;
 		playerScore = 0; state = stay; isSelect = false; obj = lev.GetAllObjects();
 		gunTexture.loadFromImage(gunImage);
 		gunSprite.setTexture(gunTexture);
 		if (name == "Player") {
-			sprite.setTextureRect(IntRect(0, 0, sizeHero.width, sizeHero.height));
+			sprite.setTextureRect(IntRect(0, 0, w, h));
 		}
 		select_weapon(weapon);
 	}
@@ -66,8 +63,8 @@ public:
 		}
 	}
 	void rotation_GG(Vector2f pos) {
-		float dX = pos.x - coord.x;//вектор , колинеарный прямой, которая пересекает спрайт и курсор
-		float dY = pos.y - coord.y;//он же, координата y
+		float dX = pos.x - x;//вектор , колинеарный прямой, которая пересекает спрайт и курсор
+		float dY = pos.y - y;//он же, координата y
 		rotation = (atan2(dY, dX)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
 	}
 	void select_weapon(int wp) {
@@ -99,42 +96,42 @@ public:
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (Dy>0) { coord.y -= 20; }
-					if (Dy<0) { coord.y += 20; }
-					if (Dx>0) { coord.x -= 20; }
-					if (Dx<0) { coord.x += 20; }
+					if (Dy>0) { y = obj[i].rect.top - h;  dy = 0; }
+					if (Dy<0) { y = obj[i].rect.top + obj[i].rect.height;   dy = 0; }
+					if (Dx>0) { x = obj[i].rect.left - w; }
+					if (Dx<0) { x = obj[i].rect.left + obj[i].rect.width; }
 				}
 			}
 
 	}
 
-	void update(float time, Vector2f coords) override {
+	void update(float time, float coordX, float coordY) {
 		CurrentFrame += 0.005f*time;
 		if (CurrentFrame > 4) CurrentFrame -= 4;
-		sprite.setTextureRect(IntRect(0, sizeHero.height * int(CurrentFrame), sizeHero.width, sizeHero.height));
+		sprite.setTextureRect(IntRect(0, h * int(CurrentFrame), w, h));
 		sprite.setRotation(rotation);//поворачиваем спрайт на эти градусы
 		gunSprite.setRotation(rotation);
 		control();//функция управления персонажем
 		switch (state){
-		case right:dSP.x = speed; dSP.y = 0; break;
-		case rightUp: dSP.x = speed; dSP.y = -speed; break;
-		case rightDown: dSP.x = speed; dSP.y = speed; break;
-		case left:dSP.x = -speed; dSP.y = 0; break;
-		case leftUp: dSP.x = -speed; dSP.y = -speed; break;
-		case leftDown: dSP.x = -speed; dSP.y = speed; break;
-		case up: dSP.x = 0; dSP.y = -speed; break;
-		case down: dSP.x = 0; dSP.y = speed; break;
+		case right:dx = speed; dy = 0; break;
+		case rightUp: dx = speed; dy = -speed; break;
+		case rightDown: dx = speed; dy = speed; break;
+		case left:dx = -speed; dy = 0; break;
+		case leftUp: dx = -speed; dy = -speed; break;
+		case leftDown: dx = -speed; dy = speed; break;
+		case up: dx = 0; dy = -speed; break;
+		case down: dx = 0; dy = speed; break;
 		case stay: break;
 		}
-		coord.x += dSP.x*time;
-		coord.y += dSP.y*time;
-		checkCollisionWithMap(dSP.x, dSP.y);//обрабатываем столкновение по Х
-		//checkCollisionWithMap(0, dSP.y);//обрабатываем столкновение по coord.y
-		sprite.setPosition(coord.x + sizeHero.width / 2, coord.y + sizeHero.height / 2); //задаем позицию спрайта в место его центра
-		gunSprite.setPosition(coord.x + sizeHero.width / 2, coord.y + sizeHero.height / 2);
+		x += dx*time;
+		checkCollisionWithMap(dx, 0);//обрабатываем столкновение по Х
+		y += dy*time;
+		checkCollisionWithMap(0, dy);//обрабатываем столкновение по Y
+		sprite.setPosition(x + w / 2, y + h / 2); //задаем позицию спрайта в место его центра
+		gunSprite.setPosition(x + w / 2, y + h / 2);
 
 		if (health <= 0) { life = false; }
 		if (!isMove) { speed = 0; }
-		if (life) { getPlayerCoordinateForView(coord.x, coord.y); }
+		if (life) { getPlayerCoordinateForView(x, y); }
 	}
 };

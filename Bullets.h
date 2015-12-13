@@ -7,27 +7,32 @@ using namespace sf;
 class Bullet :public Entity {//класс пули
 public:
 	int direction, numBull;//направление пули
-	float rotation, Dx, Dy;
-	Vector2f posPl;
-	Vector2f coordSt;
-	Bullet(Image &image, Level &lvl, Vector2f coords, FloatRect sizeHeros, Vector2f posPlayer, String Name, int damag, int numBullet) :Entity(image, coords, sizeHeros, Name) {//всё так же, только взяли в конце состояние игрока (int dir)
+	float tempy, tempx, rotation, Dx, Dy;
+	Bullet(Image &image, Level &lvl, float X, float Y, int W, int H, float tempX, float tempY, String Name, int damag, int numBullet) :Entity(image, X, Y, W, H, Name) {//всё так же, только взяли в конце состояние игрока (int dir)
 		numBull = numBullet;
 		obj = lvl.GetObjects("solid");//инициализируем .получаем нужные объекты для взаимодействия пули с картой
+		x = X;
+		y = Y;
 		damage = damag;
 		speed = 0.001f;
-		coord = coords;
-		sizeHero = sizeHeros;
-		posPl = posPlayer;
+		tempx = tempX;
+		tempy = tempY;
+		w = W;
+		h = H;
 		life = true;
-		coordSt = coord;
+		dx = x;
+		dy = y;
+		life = true;
+		Dx = tempx - x;
+		Dy = tempy - y;
 		rotation = (atan2(Dy, Dx)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
 	}
-	void update(float time, Vector2f coords) override {
-		coord.x += speed * (posPl.x - coordSt.x) * time;
-		coord.y += speed * (posPl.y - coordSt.y) * time;
+	void update(float time, float coordX, float coordY) {
+		x += speed * (tempx - dx) * time;
+		y += speed * (tempy - dy) * time;
 
-		if (coord.x <= 0) coord.x = 1;// задержка пули в левой стене, чтобы при проседании кадров она случайно не вылетела за предел карты и не было ошибки
-		if (coord.y <= 0) coord.y = 1;
+		if (x <= 0) x = 1;// задержка пули в левой стене, чтобы при проседании кадров она случайно не вылетела за предел карты и не было ошибки
+		if (y <= 0) y = 1;
 
 		for (int i = 0; i < int(obj.size()); i++) {//проход по объектам solid
 			if (getRect().intersects(obj[i].rect)) //если этот объект столкнулся с пулей,
@@ -36,6 +41,6 @@ public:
 			}
 		}
 		sprite.setRotation(rotation);
-		sprite.setPosition(coord.x + sizeHero.width / 2 + numBull * 10, coord.y + sizeHero.height / 2 + numBull * 10);//задается позицию пуле
+		sprite.setPosition(x + w / 2 + numBull * 10, y + h / 2 + numBull * 10);//задается позицию пуле
 	}
 };
