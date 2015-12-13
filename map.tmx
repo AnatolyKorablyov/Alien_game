@@ -3253,10 +3253,10 @@
   <object id="81" name="solid" x="1802" y="1951" width="144" height="40"/>
   <object id="83" name="solid" x="1601" y="1856" width="45" height="89"/>
   <object id="85" name="solid" x="1799.5" y="1856.5" width="45" height="89"/>
-  <object id="86" name="rifle" x="103" y="121" width="57" height="31"/>
-  <object id="88" name="shotgun" x="212.667" y="1016.67" width="305" height="71"/>
-  <object id="89" name="automatical" x="1371" y="925" width="89" height="42"/>
-  <object id="90" name="machineGun" x="1094" y="1464" width="84" height="88"/>
+  <object id="86" name="rifle" x="103" y="121" width="80" height="15"/>
+  <object id="88" name="shotgun" x="212.667" y="1016.67" width="80" height="15"/>
+  <object id="89" name="automatical" x="1371" y="925" width="80" height="20"/>
+  <object id="90" name="machineGun" x="1094" y="1464" width="80" height="20"/>
   <object id="93" name="bandit" x="1249" y="1633" width="104" height="56"/>
   <object id="95" name="bandit" x="1464" y="1311" width="104" height="56"/>
   <object id="98" name="solidExit" x="1651.5" y="1856" width="147" height="138"/>

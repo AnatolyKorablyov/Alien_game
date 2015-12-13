@@ -6,57 +6,57 @@ using namespace sf;
 
 class Equip : public Entity {
 public:
-	Equip(Image &image, float X, float Y, int W, int H, String Name) :Entity(image, X, Y, W, H, Name) {
-		x = X; y = Y;
-		w = W; h = H;
+	Equip(Image &image, Vector2f coords, FloatRect sizeHeros, String Name) :Entity(image, coords, sizeHeros, Name) {
+		coord = coords;
+		sizeHero = sizeHeros;
 		if (Name == "machineGun") {
-			sprite.setTextureRect(IntRect(0, 0, w, h));
+			sprite.setTextureRect(IntRect(0, 0, sizeHero.width, sizeHero.height));
 		}
 		else if (Name == "shotgun") {
-			sprite.setTextureRect(IntRect(0, 40, w, h));
+			sprite.setTextureRect(IntRect(0, 40, sizeHero.width, sizeHero.height));
 		}
 		else if (Name == "automatical") {
-			sprite.setTextureRect(IntRect(0, 20, w, h));
+			sprite.setTextureRect(IntRect(0, 20, sizeHero.width, sizeHero.height));
 		}
 		else if (Name == "rifle") {
-			sprite.setTextureRect(IntRect(0, 55, w, h));
+			sprite.setTextureRect(IntRect(0, 55, sizeHero.width, sizeHero.height));
 		}
 	}
-	void update(float time, float coordX, float coordY) {
-		sprite.setPosition(x, y);
+	void update(float time, Vector2f coords) override {
+		sprite.setPosition(coord.x, coord.y);
 	}
 };
 
 class Bonus : public Entity {
 public:
-	Bonus(Image &image, float X, float Y, int W, int H, String Name) :Entity(image, X, Y, W, H, Name) {
-		x = X; y = Y;
-		w = W; h = H;
+	Bonus(Image &image, Vector2f coords, FloatRect sizeHeros, String Name) :Entity(image, coords, sizeHeros, Name) {
+		coord = coords;
+		sizeHero = sizeHeros;
 		if (Name == "Health") {
-			sprite.setTextureRect(IntRect(100, 0, w, h));
+			sprite.setTextureRect(IntRect(100, 0, sizeHero.width, sizeHero.height));
 		}
 		else if (Name == "Armor") {
-			sprite.setTextureRect(IntRect(50, 0, w, h));
+			sprite.setTextureRect(IntRect(50, 0, sizeHero.width, sizeHero.height));
 		}
 		else if (Name == "Ammo") {
-			sprite.setTextureRect(IntRect(0, 0, w, h));
+			sprite.setTextureRect(IntRect(0, 0, sizeHero.width, sizeHero.height));
 		}
 
 	}
-	void update(float time, float coordX, float coordY) {
-		sprite.setPosition(x, y);
+	void update(float time, Vector2f coords) override {
+		sprite.setPosition(coord.x, coord.y);
 	}
 };
 
 class Exit : public Entity {
 public:
-	Exit(Image &image, float X, float Y, int W, int H, String Name) :Entity(image, X, Y, W, H, Name) {
-		x = X; y = Y;
-		w = W; h = H;
-		sprite.setTextureRect(IntRect(0, 0, w, h));
+	Exit(Image &image, Vector2f coords, FloatRect sizeHeros, String Name) :Entity(image, coords, sizeHeros, Name) {
+		coord = coords;
+		sizeHero = sizeHeros;
+		sprite.setTextureRect(IntRect(0, 0, sizeHero.width, sizeHero.height));
 		sprite.setOrigin(0, 0);
 	}
-	void update(float time, float coordX, float coordY) {
-		sprite.setPosition(x, y);
+	void update(float time, Vector2f coords) override {
+		sprite.setPosition(coord.x, coord.y);
 	}
 };
