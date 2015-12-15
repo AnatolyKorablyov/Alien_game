@@ -4,6 +4,7 @@
 #include "level.h"
 #include "view.h"
 
+
 using namespace sf;
 
 
@@ -21,6 +22,9 @@ struct life_obj {
 	int armor;
 	int damage;
 	int weapon, ammo;
+	int sec_weapon;
+	bool changeSecWeap;
+	int main_damage;
 	float rotation;
 	bool gameover = false;
 	float CurrentFrame;
@@ -54,6 +58,7 @@ public:
 
 class Player :public Entity {
 public:
+	float queueShot = 0;
 	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
 	int playerScore;
 	Player(Image &image, Image &gunImage, Level &lvl, Vector2f coord, Vector2f sizeH, Vector2f sizeG, String Name) :Entity(image, coord, sizeH, Name) {
@@ -343,6 +348,9 @@ public:
 		posTarget = posT;
 		numBull = numBullet;
 		name = Name;
+		if (name == "enemyBullet") {
+			sprite.setColor(Color::Red);
+		}
 		obj = lvl.GetObjects("solid");//инициализируем .получаем нужные объекты для взаимодействия пули с картой
 		liv_pr.damage = damag;
 		properties.speed = 0.001f;
