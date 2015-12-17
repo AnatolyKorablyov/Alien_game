@@ -9,7 +9,7 @@ using namespace sf;
 
 
 struct characteristicts {
-	float dx, dy;// скорость по координатам
+	Vector2f dist;// скорость по координатам
 	Vector2f pos;
 	float speed;
 	Vector2f sizeHero;
@@ -43,7 +43,7 @@ public:
 		properties.pos = coord;
 		properties.sizeHero = size;
 		name = Name;
-		properties.dx = 0; properties.dy = 0;
+		properties.dist.x = 0; properties.dist.y = 0;
 		properties.speed = 0;
 		properties.life = true; properties.isMove = false;
 		texture.loadFromImage(image);
@@ -141,17 +141,17 @@ public:
 			gunSprite.setTextureRect(IntRect(0, 45, 72, 15));
 		}
 	}
-	void checkCollisionWithMap(float Dx, float Dy)//ф ция проверки столкновений с картой
+	void checkCollisionWithMap(Vector2f coordSpeed)//ф ция проверки столкновений с картой
 	{
 		for (int i = 0; i < int(obj.size()); i++)//проходимся по объектам
 			if (getRect().intersects(obj[i].rect))//проверяем пересечение игрока с объектом
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (Dy>0) { properties.pos.y -= 15; }
-					if (Dy<0) { properties.pos.y += 15; }
-					if (Dx>0) { properties.pos.x -= 15; }
-					if (Dx<0) { properties.pos.x += 15; }
+					if (coordSpeed.y>0) { properties.pos.y -= 15; }
+					if (coordSpeed.y<0) { properties.pos.y += 15; }
+					if (coordSpeed.x>0) { properties.pos.x -= 15; }
+					if (coordSpeed.x<0) { properties.pos.x += 15; }
 				}
 			}
 
@@ -165,19 +165,19 @@ public:
 		gunSprite.setRotation(liv_pr.rotation);
 		control();//функция управления персонажем
 		switch (state) {
-		case right: properties.dx = properties.speed; properties.dy = 0; break;
-		case rightUp: properties.dx = properties.speed; properties.dy = -properties.speed; break;
-		case rightDown: properties.dx = properties.speed; properties.dy = properties.speed; break;
-		case left: properties.dx = -properties.speed; properties.dy = 0; break;
-		case leftUp: properties.dx = -properties.speed; properties.dy = -properties.speed; break;
-		case leftDown: properties.dx = -properties.speed; properties.dy = properties.speed; break;
-		case up: properties.dx = 0; properties.dy = -properties.speed; break;
-		case down: properties.dx = 0; properties.dy = properties.speed; break;
+		case right: properties.dist.x = properties.speed; properties.dist.y = 0; break;
+		case rightUp: properties.dist.x = properties.speed; properties.dist.y = -properties.speed; break;
+		case rightDown: properties.dist.x = properties.speed; properties.dist.y = properties.speed; break;
+		case left: properties.dist.x = -properties.speed; properties.dist.y = 0; break;
+		case leftUp: properties.dist.x = -properties.speed; properties.dist.y = -properties.speed; break;
+		case leftDown: properties.dist.x = -properties.speed; properties.dist.y = properties.speed; break;
+		case up: properties.dist.x = 0; properties.dist.y = -properties.speed; break;
+		case down: properties.dist.x = 0; properties.dist.y = properties.speed; break;
 		case stay: break;
 		}
-		properties.pos.x += properties.dx*time;
-		properties.pos.y += properties.dy*time;
-		checkCollisionWithMap(properties.dx, properties.dy);//обрабатываем столкновение по Y
+		properties.pos.x += properties.dist.x*time;
+		properties.pos.y += properties.dist.y*time;
+		checkCollisionWithMap(properties.dist);//обрабатываем столкновение по Y
 		sprite.setPosition(properties.pos.x + properties.sizeHero.x / 2, properties.pos.y + properties.sizeHero.y / 2); //задаем позицию спрайта в место его центра
 		gunSprite.setPosition(properties.pos.x + properties.sizeHero.x / 2, properties.pos.y + properties.sizeHero.y / 2);
 
@@ -232,43 +232,43 @@ public:
 		liv_pr.CurrentFrame += 0.001f*time;
 		if (liv_pr.CurrentFrame > numFrame) liv_pr.CurrentFrame -= numFrame;
 		sprite.setTextureRect(IntRect(0, properties.sizeHero.x * int(liv_pr.CurrentFrame), properties.sizeHero.y, properties.sizeHero.x));
-		properties.dx = posPlayerX - properties.pos.x;
-		properties.dy = posPlayerY - properties.pos.y;
+		properties.dist.x = posPlayerX - properties.pos.x;
+		properties.dist.y = posPlayerY - properties.pos.y;
 	}
 
 	void update(float time, float posPlayerX, float posPlayerY) {
 		if (name == "easyEnemy"|| name == "mediumEnemy")  {//для персонажа с таким именем логика будет такой
 			same_action_enemys(time, posPlayerX, posPlayerY, 2);
-			if (properties.dx > 0) {
+			if (properties.dist.x > 0) {
 				properties.pos.x += properties.speed * time;
 			}
-			else if (properties.dx < 0)
+			else if (properties.dist.x < 0)
 				properties.pos.x -= properties.speed * time;
-			if (properties.dy > 0) {
+			if (properties.dist.y > 0) {
 				properties.pos.y += properties.speed * time;
 			}
-			else if (properties.dy < 0)
+			else if (properties.dist.y < 0)
 				properties.pos.y -= properties.speed * time;
-			liv_pr.rotation = (atan2(properties.dx, properties.dy)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
-			checkCollisionWithMap(properties.dx, properties.dy);//обрабатываем столкновение по Х
+			liv_pr.rotation = (atan2(properties.dist.x, properties.dist.y)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
+			checkCollisionWithMap(properties.dist.x, properties.dist.y);//обрабатываем столкновение по Х
 			sprite.setRotation(-liv_pr.rotation);
 			sprite.setPosition(properties.pos.x + properties.sizeHero.y / 2, properties.pos.y + properties.sizeHero.x / 2); //задаем позицию спрайта в место его центра
 			if (liv_pr.health <= 0) { properties.life = false; }
 		}
 		if (name == "bandit") {
 			same_action_enemys(time, posPlayerX, posPlayerY, 4);
-			if (properties.dx > 0 && properties.dx > 500) {
+			if (properties.dist.x > 0 && properties.dist.x > 500) {
 				properties.pos.x += properties.speed * time;
 			}
-			else if (properties.dx < 0 && properties.dx < -500)
+			else if (properties.dist.x < 0 && properties.dist.x < -500)
 				properties.pos.x -= properties.speed* time;
-			if (properties.dy > 0 && properties.dy > 300) {
+			if (properties.dist.y > 0 && properties.dist.y > 300) {
 				properties.pos.y += properties.speed* time;
 			}
-			else if (properties.dy < 0 && properties.dy < -300)
+			else if (properties.dist.y < 0 && properties.dist.y < -300)
 				properties.pos.y -= properties.speed* time;
-			liv_pr.rotation = (atan2(properties.dx, properties.dy)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
-			checkCollisionWithMap(properties.dx, properties.dy);//обрабатываем столкновение по Х
+			liv_pr.rotation = (atan2(properties.dist.x, properties.dist.y)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
+			checkCollisionWithMap(properties.dist.x, properties.dist.y);//обрабатываем столкновение по Х
 			sprite.setRotation(-liv_pr.rotation + 90);
 			gunSprite.setRotation(-liv_pr.rotation + 90);
 			sprite.setPosition(properties.pos.x + properties.sizeHero.y / 2, properties.pos.y + properties.sizeHero.x / 2); //задаем позицию спрайта в место его центра

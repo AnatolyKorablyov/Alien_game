@@ -6,15 +6,14 @@
 #include <vector>
 #include "Classes.h"
 #include "LoadFiles.h"
-#include "InitObjOnMap.h"
+#include "InitObjOnMap.h" 
 
 using namespace sf;
 
 static const sf::Vector2f WINDOW_SIZE = { 1370, 768 };
 
-
-
-void skip_to_list(std::vector<Entity*>::iterator it, std::vector<Entity*>  &entities, Player p, int &randBonus, Image bonusImage, Sprite meetSprite, float time, float timeGame) {
+void skip_to_list(std::vector<Entity*>::iterator it, std::vector<Entity*>  &entities, Player p, Image bonusImage, Sprite meetSprite, float time, float timeGame) {
+	int randBonus;
 	for (it = entities.begin(); it != entities.end();) {//говорим что проходимся от начала до конца
 		Entity *b = (*it);//для удобства, чтобы не писать (*it)->
 		if (b->properties.life == false) {
@@ -70,7 +69,8 @@ void damage_player_to_enemys(Entity* &one, Entity* &two) {
 }
 
 void clashes_enemys(Entity* &one, Entity* &two) {
-	if (one->getRect().intersects(two->getRect())) {
+	if (one->getRect().intersects(two->getRect()) && (one->name == "easyEnemy" || one->name == "mediumEnemy" || one->name == "bandit") && 
+		((two->name == "easyEnemy" || two->name == "mediumEnemy" || two->name == "bandit"))) {
 		if (one->properties.pos.x > two->properties.pos.x) {
 			one->properties.pos.x -= 5;
 			two->properties.pos.x += 5;
@@ -187,7 +187,7 @@ void check_clashes(std::vector<Entity*>  &entities, Player &p, init_sounds &soun
 
 void shooting_enemy(std::vector<Entity*>::iterator it, std::vector<Entity*>  &entities, Player p, Image bulletImage, Level lvl, float timeGame) {
 	for (it = entities.begin(); it != entities.end(); it++) {
-		if ((*it)->name == "bandit" && ((*it)->properties.dx <= 500 || (*it)->properties.dx <= -500) && ((*it)->properties.dy < 300 || (*it)->properties.dy < 300) && (*it)->enemyShot < timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
+		if ((*it)->name == "bandit" && ((*it)->properties.dist.x <= 500 || (*it)->properties.dist.x <= -500) && ((*it)->properties.dist.y < 300 || (*it)->properties.dist.y < 300) && (*it)->enemyShot < timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
 			Vector2f sizeHero = { 23, 7 };
 			Vector2f posPl = { (*it)->properties.pos.x + (*it)->properties.sizeHero.y / 2, (*it)->properties.pos.y + (*it)->properties.sizeHero.x / 2 };
 			
@@ -199,7 +199,6 @@ void shooting_enemy(std::vector<Entity*>::iterator it, std::vector<Entity*>  &en
 
 
 void start_game() {
-	int randBonus;
 	float queueShot = 0, enemyShot = 0;
 	int countEnemy = 0;
 
@@ -261,6 +260,9 @@ void start_game() {
 		while (window.pollEvent(event)) {
 			if (event.type == sf::Event::Closed)
 				window.close();
+			if (event.key.code == Keyboard::M) {
+				init_objects_in_map(lvl, entities, pict);
+			}
 			if (isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
 				isShoot = false;
 			posPl = { p.properties.pos.x + p.properties.sizeHero.y / 2, p.properties.pos.y + p.properties.sizeHero.x / 2 };
@@ -299,7 +301,7 @@ void start_game() {
 			p.update(time, p.properties.pos.x, p.properties.pos.y);// Player update function
 
 
-		skip_to_list(it, entities, p, randBonus, pict.bonusImage, meetSprite, time, timeGame);
+		skip_to_list(it, entities, p, pict.bonusImage, meetSprite, time, timeGame);
 		shooting_enemy(it, entities, p, pict.bulletImage, lvl, timeGame);
 		check_clashes(entities, p, sounds, window, areaClean);
 
