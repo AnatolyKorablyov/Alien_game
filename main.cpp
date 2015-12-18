@@ -7,185 +7,14 @@
 #include "Classes.h"
 #include "LoadFiles.h"
 #include "InitObjOnMap.h" 
+#include "ActionEnemyAndOtherObj.h"
+#include "ActionPlayer.h"
 
 using namespace sf;
 
 static const sf::Vector2f WINDOW_SIZE = { 1370, 768 };
 
-
-void skip_to_list(std::vector<Entity*>  &entities, Player p, game_indicators &GI, float time) {
-	int randBonus;
-	Image bonusImage = GI.pict.bonusImage;
-	Sprite meetSprite = GI.pict.meetSprite;
-	std::vector<Entity*>::iterator it;
-	for (it = entities.begin(); it != entities.end();) {//говорим что проходимся от начала до конца
-		Entity *b = (*it);//для удобства, чтобы не писать (*it)->
-		if (b->properties.life == false) {
-			if (b->name == "bandit" || b->name == "easyEnemy" || b->name == "mediumEnemy") { //TODO cut on function
-				randBonus = rand() % 15;
-				Vector2f sizeBonus = { 50, 50 };
-				if (randBonus == 1)
-					entities.push_back(new Bonus(bonusImage, b->properties.pos, sizeBonus, "Ammo"));
-				if (randBonus == 2)
-					entities.push_back(new Bonus(bonusImage, b->properties.pos, sizeBonus, "Armor"));
-				if (randBonus == 3)
-					entities.push_back(new Bonus(bonusImage, b->properties.pos, sizeBonus, "Health"));
-				if (b->timeDeath == 0) {
-					b->name = "meet";
-					b->sprite = meetSprite;
-					b->sprite.setTextureRect(IntRect(0, 0, 80, 80));
-					b->sprite.setPosition(b->properties.pos.x, b->properties.pos.y);
-					b->timeDeath = GI.timeGame + 1;
-					it++;
-				}
-				else if (b->timeDeath < GI.timeGame) {
-					it = entities.erase(it); delete b;// если этот объект мертв, то удаляем его
-				}
-				else it++;
-			}
-			else {
-				it = entities.erase(it); delete b;
-			}
-		}
-		else {
-			b->update(time, p.properties.pos);//вызываем ф-цию update для всех объектов (по сути для тех, кто жив)
-			it++;//и идем курсором (итератором) к след объекту. так делаем со всеми объектами списка
-		}
-	}
-}
-
-void damage_player_to_enemys(Entity* &one, Entity* &two) {
-	if (one->getRect().intersects(two->getRect()) && ((two->name == "Bullet") && (one->name == "easyEnemy"))) {
-		one->liv_pr.health -= two->liv_pr.damage;
-		two->properties.life = false;
-	}
-	if (one->getRect().intersects(two->getRect()) && ((two->name == "Bullet") && (one->name == "mediumEnemy"))) {
-		one->liv_pr.health -= two->liv_pr.damage;
-		two->properties.life = false;
-	}
-	if (one->getRect().intersects(two->getRect()) && ((two->name == "Bullet") && (one->name == "bandit"))) {
-		if (one->liv_pr.armor > 0)
-			one->liv_pr.armor -= two->liv_pr.damage;
-		else
-			one->liv_pr.health -= two->liv_pr.damage;
-		two->properties.life = false;
-	}
-}
-
-void clashes_enemys(Entity* &one, Entity* &two) {
-	if (one->getRect().intersects(two->getRect()) && (one->name == "easyEnemy" || one->name == "mediumEnemy" || one->name == "bandit") && 
-		((two->name == "easyEnemy" || two->name == "mediumEnemy" || two->name == "bandit"))) {
-		if (one->properties.pos.x > two->properties.pos.x) {
-			one->properties.pos.x -= 5;
-			two->properties.pos.x += 5;
-		}
-		else {
-			one->properties.pos.x += 5;
-			two->properties.pos.x -= 5;
-		}
-		if (one->properties.pos.y > two->properties.pos.x) {
-			one->properties.pos.y += 5;
-			two->properties.pos.y -= 5;
-		}
-		else {
-			one->properties.pos.y -= 5;
-			two->properties.pos.y += 5;
-		}
-	}
-}
-
-void damage_enemys_to_player(Entity* &one, Player &p, init_sounds &sounds) {
-	if (one->name == "easyEnemy" || one->name == "mediumEnemy") {
-		if (one->properties.pos.x > p.properties.pos.x)
-			one->properties.pos.x -= 15;
-		else
-			one->properties.pos.x += 15;
-		if (one->properties.pos.y > p.properties.pos.y)
-			one->properties.pos.y += 15;
-		else
-			one->properties.pos.y -= 15;
-		if (p.liv_pr.armor > 0)
-			p.liv_pr.armor -= one->liv_pr.damage;
-		else
-			p.liv_pr.health -= one->liv_pr.damage;
-		sounds.damage.play();
-	}
-	if (one->name == "enemyBullet") {
-		if (p.liv_pr.armor > 0)
-			p.liv_pr.armor -= one->liv_pr.damage;
-		else
-			p.liv_pr.health -= one->liv_pr.damage;
-		one->properties.life = false;
-	}
-}
-
-void pick_up_weapon(Entity* &one, Player &p) {
-	if (one->name == "machineGun") {
-		p.liv_pr.num_weapon = 1;
-		p.liv_pr.main_weapon = 0;
-		p.liv_pr.ammo = 100;
-		p.liv_pr.main_damage = 15;
-		p.select_weapon(p.liv_pr);
-		one->properties.life = false;
-		p.queueShot = 0;
-	}
-	else if (one->name == "shotgun") {
-		p.liv_pr.num_weapon = 1;
-		p.liv_pr.main_weapon = 1;
-		p.liv_pr.ammo = 4;
-		p.liv_pr.main_damage = 30;
-		p.select_weapon(p.liv_pr);
-		p.queueShot = 0;
-		one->properties.life = false;
-	}
-	else if (one->name == "automatical") {
-		p.liv_pr.num_weapon = 1;
-		p.liv_pr.main_weapon = 2;
-		p.liv_pr.ammo = 30;
-		p.liv_pr.main_damage = 20;
-		p.select_weapon(p.liv_pr);
-		one->properties.life = false;
-		p.queueShot = 0;
-	}
-	else if (one->name == "rifle") {
-		p.liv_pr.num_weapon = 1;
-		p.liv_pr.main_weapon = 3;
-		p.liv_pr.ammo = 10;
-		p.liv_pr.main_damage = 150;
-		p.select_weapon(p.liv_pr);
-		one->properties.life = false;
-		p.queueShot = 0;
-	}
-}
-
-void pick_up_bonuses_and_exit(Entity* &one, Player &p) {
-	if (one->name == "Ammo") {
-		p.liv_pr.ammo += 2;
-		one->properties.life = false;
-	}
-	if (one->name == "Armor") {
-		one->properties.life = false;
-		if (p.liv_pr.armor + 20 < 100)
-			p.liv_pr.armor += 20;
-		else if (p.liv_pr.armor == 100)
-			one->properties.life = true;
-		else
-			p.liv_pr.armor = 100;
-	}
-	if (one->name == "Health") {
-		one->properties.life = false;
-		if (p.liv_pr.health + 20 < 100)
-			p.liv_pr.health += 20;
-		else if (p.liv_pr.health == 100)
-			one->properties.life = true;
-		else
-			p.liv_pr.health = 100;
-	}
-	if (one->name == "solidExit") {
-		p.properties.pos.y -= p.properties.sizeHero.y / 2;
-	}
-}
-void check_clashes(std::vector<Entity*>  &entities, Player &p, RenderWindow &window, game_indicators &GI) {
+void check_clashes_all(std::vector<Entity*>  &entities, Player &p, RenderWindow &window, game_indicators &GI) {
 	for (auto i : entities) {//проходимся по эл-там списка TODO cut on function
 		for (auto j : entities) {
 			damage_player_to_enemys(i, j);
@@ -197,65 +26,6 @@ void check_clashes(std::vector<Entity*>  &entities, Player &p, RenderWindow &win
 			pick_up_bonuses_and_exit(i, p);
 			if (i->name == "exit" && GI.areaClean)
 				window.close();
-		}
-	}
-}
-
-void shooting_enemy(std::vector<Entity*>  &entities, Player p, game_indicators &GI) {
-	std::vector<Entity*>::iterator it;
-	for (it = entities.begin(); it != entities.end(); it++) {
-		if ((*it)->name == "bandit" && ((*it)->properties.dist.x <= 500 || (*it)->properties.dist.x <= -500) && ((*it)->properties.dist.y < 300 || (*it)->properties.dist.y < 300) && (*it)->enemyShot < GI.timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
-			Vector2f sizeHero = { 23, 7 };
-			Vector2f posPl = { (*it)->properties.pos.x + (*it)->properties.sizeHero.y / 2, (*it)->properties.pos.y + (*it)->properties.sizeHero.x / 2 };
-			
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, p.properties.pos, "enemyBullet", (*it)->liv_pr.damage, 0));
-			(*it)->enemyShot = GI.timeGame + 1;
-		}
-	}
-}
-
-void player_shotting(Event event, std::vector<Entity*>  &entities, Player &p, game_indicators &GI) {
-	if (p.isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
-		p.isShoot = false;
-	Vector2f posPl = { p.properties.pos.x + p.properties.sizeHero.y / 2, p.properties.pos.y + p.properties.sizeHero.x / 2 };
-	Vector2f sizeHero = { 23, 7 };
-	if (p.liv_pr.num_weapon == 1) {
-		if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 0 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) { //TODO cut on function
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			p.liv_pr.ammo -= 1;
-			p.isShoot = true;
-			p.queueShot = GI.timeGame + 0.1;
-			GI.sounds.shootMachine.play();
-		}
-		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 1 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 1));
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 2));
-			p.liv_pr.ammo -= 1;
-			p.queueShot = GI.timeGame + 1;
-			GI.sounds.shootShootGun.play();
-		}
-		else if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 2 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			p.liv_pr.ammo -= 1;
-			p.isShoot = true;
-			p.queueShot = GI.timeGame + 0.1;
-			GI.sounds.shootMachine.play();
-		}
-		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 3 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			p.liv_pr.ammo -= 1;
-			p.queueShot = GI.timeGame + 2;
-			GI.sounds.shootRifle.play();
-		}
-		else if (event.key.code == Mouse::Left)
-			GI.sounds.shootReload.play();
-	}
-	else if (p.liv_pr.num_weapon == 2) {
-		if (event.key.code == Mouse::Left && GI.timeGame > p.queueShot) {
-			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			p.queueShot = GI.timeGame + 0.2;
-			GI.sounds.shootRifle.play();
 		}
 	}
 }
@@ -279,6 +49,73 @@ void draw_objects(std::vector<Entity*>  entities, game_indicators &GI, RenderWin
 		}
 	}
 }
+
+void set_param_text(game_indicators &GI, Vector2f pos_text, String strHP, Color col){
+	GI.font.text_albion.setPosition(pos_text.x, pos_text.y);
+	GI.font.text_albion.setColor(col);
+	GI.font.text_albion.setString(strHP);
+}
+
+void draw_text(RenderWindow &window, game_indicators &GI, Player p) {
+	Vector2f posit = { GI.posView.x + 600, GI.posView.y - 360 };
+	int HP = GI.countEnemy;
+	String strHP = std::to_string(HP);
+	set_param_text(GI, posit, strHP, Color::Blue);
+	window.draw(GI.font.text_albion);
+	posit = { GI.posView.x - 100, GI.posView.y - 50 };
+	if (GI.countEnemy == 0) { //TODO cut on function
+		GI.areaClean = true;
+		set_param_text(GI, posit, "AREA CLEAN", Color::Blue);
+		window.draw(GI.font.text_albion);//рисую этот текст
+	}
+	if (!p.properties.life) {
+		set_param_text(GI, posit, "GAME OVER", Color::Red);
+		window.draw(GI.font.text_albion);//рисую этот текст
+	}
+	else {
+		posit = { GI.posView.x - 610, GI.posView.y + 290 };//задаем позицию текста, слева внизу
+		HP = p.liv_pr.health;
+		strHP = std::to_string(HP);
+		set_param_text(GI, posit, strHP, Color::Red);
+		window.draw(GI.font.text_albion);//рисую этот текст
+
+		if (p.liv_pr.armor > 0) {
+			posit = { GI.posView.x - 530, GI.posView.y + 290 };//задаем позицию текста, слева внизу
+			HP = p.liv_pr.armor;
+			strHP = std::to_string(HP);
+			set_param_text(GI, posit, strHP, Color::Blue);
+			window.draw(GI.font.text_albion);//рисую этот текст]
+		}
+		posit = { GI.posView.x + 500, GI.posView.y + 290 };//задаем позицию текста, слева внизу
+		if (p.liv_pr.num_weapon != 1) {
+			strHP = "unlimit";
+		}
+		else {
+			HP = p.liv_pr.ammo;
+			strHP = std::to_string(HP);
+		}
+		set_param_text(GI, posit, strHP, Color::Cyan);
+		window.draw(GI.font.text_albion);//рисую этот текст
+	}
+}
+
+
+void ALL_draw(RenderWindow &window, game_indicators &GI, Player &p, std::vector<Entity*>  entities) {
+	GI.countEnemy = 0;
+	window.setView(view);
+	window.clear();
+	GI.posView = view.getCenter();
+	GI.lvl.Draw(window);
+	draw_objects(entities, GI, window);
+	window.draw(p.gunSprite);
+	window.draw(p.sprite);
+	draw_text(window, GI, p);
+	if (p.liv_pr.gameover) {
+		window.close();
+	}
+	window.display();
+}
+
 void start_game() {
 	game_indicators GI;
 	std::vector<Entity*>  entities;
@@ -286,12 +123,8 @@ void start_game() {
 
 	sf::RenderWindow window(sf::VideoMode(int(WINDOW_SIZE.x), int(WINDOW_SIZE.y)), "Alien Overkill");
 	view.reset(sf::FloatRect(0, 0, WINDOW_SIZE.x, WINDOW_SIZE.y));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
-
-	
-
 	init_objects_in_map(entities, GI);
 
-	
 	Vector2f posPl = { GI.player.rect.left, GI.player.rect.top };
 	Vector2f sizeHero = { GI.player.rect.height, GI.player.rect.width };
 	Vector2f sizeGun = { 72, 15 };
@@ -300,7 +133,6 @@ void start_game() {
 	Clock gameTime;
 
 	while (window.isOpen()) {
-		std::vector<Entity*>::iterator at;//второй итератор.для взаимодействия между объектами списка
 		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
 		GI.pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
 		float time = float(clock.getElapsedTime().asMicroseconds());
@@ -311,84 +143,18 @@ void start_game() {
 		while (window.pollEvent(event)) {
 			if (event.type == sf::Event::Closed)
 				window.close();
-			if (event.key.code == Keyboard::M) {
-				init_objects_in_map(entities, GI);
-			}
 			player_shotting(event, entities, p, GI);
-			
 		}
+
 		p.rotation_GG(GI.pos);
 		if (p.properties.life)
-			p.update(time, p.properties.pos);// Player update function
-
+			p.update(time, p.properties.pos);
 
 		skip_to_list(entities, p, GI, time);
 		shooting_enemy(entities, p, GI);
-		check_clashes(entities, p, window, GI);
+		check_clashes_all(entities, p, window, GI);
 
-		GI.countEnemy = 0;
-		window.setView(view);
-		window.clear();
-		GI.posView = view.getCenter();
-		GI.lvl.Draw(window);//рисуем новую карту
-		draw_objects(entities, GI, window);
-		window.draw(p.gunSprite);
-		window.draw(p.sprite);
-		GI.font.text_albion.setPosition(GI.posView.x + 600, GI.posView.y - 360);
-		GI.font.HP = GI.countEnemy;
-		GI.font.strHP = std::to_string(GI.font.HP);
-		GI.font.text_albion.setColor(Color::Blue);
-		GI.font.text_albion.setString(GI.font.strHP);
-		window.draw(GI.font.text_albion);
-		if (GI.countEnemy == 0) { //TODO cut on function
-			//sounds.music.stop();
-			GI.areaClean = true;
-			GI.font.text_albion.setPosition(GI.posView.x - 100, GI.posView.y - 50);//задаем позицию текста, центр камеры
-			GI.font.text_albion.setColor(Color::Blue);
-			GI.font.text_albion.setString("AREA CLEAN");//задает строку тексту
-			window.draw(GI.font.text_albion);//рисую этот текст
-		}
-		if (!p.properties.life) {
-			GI.font.text_albion.setPosition(GI.posView.x - 100, GI.posView.y - 50);//задаем позицию текста, центр камеры
-			GI.font.text_albion.setColor(Color::Red);
-			GI.font.text_albion.setString("GAME OVER");//задает строку тексту
-			window.draw(GI.font.text_albion);//рисую этот текст
-		}
-		else {
-			GI.font.text_albion.setPosition(GI.posView.x - 610, GI.posView.y + 290);//задаем позицию текста, слева внизу
-			GI.font.text_albion.setColor(Color::Red);
-			GI.font.HP = p.liv_pr.health;
-			GI.font.strHP = std::to_string(GI.font.HP);
-			GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
-			window.draw(GI.font.text_albion);//рисую этот текст
-
-			if (p.liv_pr.armor > 0) {
-				GI.font.text_albion.setPosition(GI.posView.x - 530, GI.posView.y + 290);//задаем позицию текста, слева внизу
-				GI.font.text_albion.setColor(Color::Blue); // броня
-				GI.font.HP = p.liv_pr.armor;
-				GI.font.strHP = std::to_string(GI.font.HP);
-				GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
-				window.draw(GI.font.text_albion);//рисую этот текст]
-			}
-
-			GI.font.text_albion.setPosition(GI.posView.x + 500, GI.posView.y + 290);//задаем позицию текста, слева внизу
-			GI.font.text_albion.setColor(Color::Cyan); // броня
-			
-			if (p.liv_pr.num_weapon != 1) {
-				GI.font.strHP = "unlimit";
-			}
-			else {
-				GI.font.HP = p.liv_pr.ammo;
-				GI.font.strHP = std::to_string(GI.font.HP);
-			}
-
-			GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
-			window.draw(GI.font.text_albion);//рисую этот текст
-		}
-		if (p.liv_pr.gameover) {
-			window.close();
-		}
-		window.display();
+		ALL_draw(window, GI, p, entities);
 	}
 }
 

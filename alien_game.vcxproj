@@ -132,7 +132,9 @@
     <ClCompile Include="TinyXML\tinyxmlparser.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ActionPlayer.h" />
     <ClInclude Include="Classes.h" />
+    <ClInclude Include="ActionEnemyAndOtherObj.h" />
     <ClInclude Include="Enemys.h" />
     <ClInclude Include="InitObjOnMap.h" />
     <ClInclude Include="level.h" />

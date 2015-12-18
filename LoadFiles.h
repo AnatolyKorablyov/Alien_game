@@ -63,8 +63,6 @@ struct init_picture {
 struct init_fonts {
 	Font albionic;
 	Text text_albion;
-	int HP;
-	String strHP;
 
 	init_fonts(){
 		albionic.loadFromFile("images/Albionic.ttf");
