@@ -26,7 +26,7 @@ void pick_up_weapon(Entity* &one, Player &p) {
 		p.liv_pr.main_damage = 15;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
-		p.queueShot = 0;
+		p.m_queueShot = 0;
 	}
 	else if (one->name == "shotgun") {
 		p.liv_pr.num_weapon = 1;
@@ -34,7 +34,7 @@ void pick_up_weapon(Entity* &one, Player &p) {
 		p.liv_pr.ammo = 4;
 		p.liv_pr.main_damage = 30;
 		p.select_weapon(p.liv_pr);
-		p.queueShot = 0;
+		p.m_queueShot = 0;
 		one->properties.life = false;
 	}
 	else if (one->name == "automatical") {
@@ -44,7 +44,7 @@ void pick_up_weapon(Entity* &one, Player &p) {
 		p.liv_pr.main_damage = 20;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
-		p.queueShot = 0;
+		p.m_queueShot = 0;
 	}
 	else if (one->name == "rifle") {
 		p.liv_pr.num_weapon = 1;
@@ -53,7 +53,7 @@ void pick_up_weapon(Entity* &one, Player &p) {
 		p.liv_pr.main_damage = 150;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
-		p.queueShot = 0;
+		p.m_queueShot = 0;
 	}
 }
 
@@ -86,46 +86,46 @@ void pick_up_bonuses_and_exit(Entity* &one, Player &p) {
 }
 
 void player_shotting(Event event, std::vector<Entity*>  &entities, Player &p, game_indicators &GI) {
-	if (p.isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
-		p.isShoot = false;
+	if (p.m_isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
+		p.m_isShoot = false;
 	Vector2f posPl = { p.properties.pos.x + p.properties.sizeHero.y / 2, p.properties.pos.y + p.properties.sizeHero.x / 2 };
 	Vector2f sizeHero = { 23, 7 };
 	if (p.liv_pr.num_weapon == 1) {
-		if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 0 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) { //TODO cut on function
+		if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.m_isShoot) && p.liv_pr.main_weapon == 0 && p.liv_pr.ammo > 0 && GI.timeGame > p.m_queueShot) { //TODO cut on function
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
 			p.liv_pr.ammo -= 1;
-			p.isShoot = true;
-			p.queueShot = GI.timeGame + 0.1;
+			p.m_isShoot = true;
+			p.m_queueShot = GI.timeGame + 0.1;
 			GI.sounds.shootMachine.play();
 		}
-		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 1 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 1 && p.liv_pr.ammo > 0 && GI.timeGame > p.m_queueShot) {
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 1));
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 2));
 			p.liv_pr.ammo -= 1;
-			p.queueShot = GI.timeGame + 1;
+			p.m_queueShot = GI.timeGame + 1;
 			GI.sounds.shootShootGun.play();
 		}
-		else if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 2 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+		else if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.m_isShoot) && p.liv_pr.main_weapon == 2 && p.liv_pr.ammo > 0 && GI.timeGame > p.m_queueShot) {
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
 			p.liv_pr.ammo -= 1;
-			p.isShoot = true;
-			p.queueShot = GI.timeGame + 0.1;
+			p.m_isShoot = true;
+			p.m_queueShot = GI.timeGame + 0.1;
 			GI.sounds.shootMachine.play();
 		}
-		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 3 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 3 && p.liv_pr.ammo > 0 && GI.timeGame > p.m_queueShot) {
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
 			p.liv_pr.ammo -= 1;
-			p.queueShot = GI.timeGame + 2;
+			p.m_queueShot = GI.timeGame + 2;
 			GI.sounds.shootRifle.play();
 		}
 		else if (event.key.code == Mouse::Left)
 			GI.sounds.shootReload.play();
 	}
 	else if (p.liv_pr.num_weapon == 2) {
-		if (event.key.code == Mouse::Left && GI.timeGame > p.queueShot) {
+		if (event.key.code == Mouse::Left && GI.timeGame > p.m_queueShot) {
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
-			p.queueShot = GI.timeGame + 0.2;
+			p.m_queueShot = GI.timeGame + 0.2;
 			GI.sounds.shootRifle.play();
 		}
 	}

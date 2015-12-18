@@ -62,10 +62,9 @@ public:
 
 class Player :public Entity {
 public:
-	bool isShoot;
-	float queueShot = 0;
+	bool m_isShoot;
+	float m_queueShot = 0;
 	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
-	int playerScore;
 	Player(Image &image, Image &gunImage, Level &lvl, Vector2f coord, Vector2f sizeH, Vector2f sizeG, String Name) :Entity(image, coord, sizeH, Name) {
 		properties.sizeHero = sizeH;
 		properties.pos = coord;
@@ -73,9 +72,10 @@ public:
 		name = Name;
 		obj = lvl.GetAllObjects();
 		liv_pr.num_weapon = 1;
+		liv_pr.main_damage = 30;
 		liv_pr.ammo = 6;
 		liv_pr.health = 100; liv_pr.armor = 100; liv_pr.main_weapon = 1;
-		playerScore = 0; state = stay;
+		state = stay;
 		liv_pr.sec_damage = 20;
 		gunTexture.loadFromImage(gunImage);
 		gunSprite.setTexture(gunTexture);
@@ -93,12 +93,12 @@ public:
 		if (Keyboard::isKeyPressed(Keyboard::Num2)) {
 			liv_pr.num_weapon = 2;
 			liv_pr.change_weapon = true;
-			queueShot = 0;
+			m_queueShot = 0;
 		}
 		if (Keyboard::isKeyPressed(Keyboard::Num3)) {
 			liv_pr.num_weapon = 3;
 			liv_pr.change_weapon = true;
-			queueShot = 0;
+			m_queueShot = 0;
 		}
 		bool pressBut = false;
 		if (Keyboard::isKeyPressed(Keyboard::A)) {
@@ -179,7 +179,7 @@ public:
 
 	}
 
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG)  override {
 		liv_pr.CurrentFrame += 0.005f*time;
 		control();//функция управления персонажем
 		if (liv_pr.change_weapon){
@@ -263,7 +263,7 @@ public:
 		properties.dist.y = posGG.y - properties.pos.y;
 	}
 
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG) override {
 		if (name == "easyEnemy"|| name == "mediumEnemy")  {//для персонажа с таким именем логика будет такой
 			same_action_enemys(time, posGG, 2);
 			if (properties.dist.x > 0) {
@@ -324,7 +324,7 @@ public:
 			sprite.setTextureRect(IntRect(0, 55, properties.sizeHero.y, properties.sizeHero.x));
 		}
 	}
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG)  override {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -346,7 +346,7 @@ public:
 		}
 
 	}
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG) override {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -359,7 +359,7 @@ public:
 		sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
 		sprite.setOrigin(0, 0);
 	}
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG)  override {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -385,7 +385,7 @@ public:
 		posStart = properties.pos;
 		liv_pr.rotation = (atan2(posTarget.y - properties.pos.x, posTarget.y - properties.pos.x)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
 	}
-	void update(float time, Vector2f posGG) {
+	void update(float time, Vector2f posGG) override {
 		properties.pos.x += properties.speed * (posTarget.x - posStart.x) * time;
 		properties.pos.y += properties.speed * (posTarget.y - posStart.y) * time;
 
