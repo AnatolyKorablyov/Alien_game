@@ -45,6 +45,7 @@ public:
 	Texture texture, gunTexture;
 	Sprite sprite, gunSprite;
 	String name;
+	Entity();
 	Entity(Image &image, Vector2f coord, Vector2f size, String Name) {
 		properties.pos = coord;
 		properties.sizeHero = size;
@@ -59,6 +60,10 @@ public:
 	FloatRect getRect() {//ф-ция получения прямоугольника. его коорд,размеры (шир,высот).
 		return FloatRect(properties.pos.x, properties.pos.y, properties.sizeHero.y, properties.sizeHero.x);//эта ф-ция нужна для проверки столкновений 
 	}
+	bool Intersects(Entity* two) {
+		if (getRect().intersects(two->getRect()))
+			return true;
+	}
 	virtual void update(float time, Vector2f posGG) = 0;
 };
 
@@ -67,6 +72,7 @@ public:
 	bool m_isShoot;
 	float m_queueShot = 0;
 	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
+	Player();
 	Player(Image &image, Image &gunImage, Level &lvl, Vector2f coord, Vector2f sizeH, Vector2f sizeG, String Name) :Entity(image, coord, sizeH, Name) {
 		properties.sizeHero = sizeH;
 		properties.pos = coord;
@@ -82,7 +88,7 @@ public:
 		gunTexture.loadFromImage(gunImage);
 		gunSprite.setTexture(gunTexture);
 		if (name == "Player") {
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		select_weapon(liv_pr);
 	}
@@ -190,7 +196,7 @@ public:
 		}
 		if ((liv_pr.CurrentFrame > 4 && liv_pr.num_weapon == 1) || (liv_pr.CurrentFrame > 8 && liv_pr.num_weapon == 2)) 
 			liv_pr.CurrentFrame -= 4;
-		sprite.setTextureRect(IntRect(0, properties.sizeHero.x * int(liv_pr.CurrentFrame), properties.sizeHero.y, properties.sizeHero.x));
+		sprite.setTextureRect(IntRect(0, int(properties.sizeHero.x) * int(liv_pr.CurrentFrame), int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		sprite.setRotation(liv_pr.rotation);//поворачиваем спрайт на эти градусы
 		gunSprite.setRotation(liv_pr.rotation);
 		switch (state) {
@@ -230,16 +236,16 @@ public:
 		enemyShot = 0;
 		if (name == "easyEnemy") {
 			properties.speed = 0.03f; liv_pr.health = 50; liv_pr.armor = 0; liv_pr.damage = 1;
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		if (name == "mediumEnemy") {
 			properties.speed = 0.06f; liv_pr.health = 100; liv_pr.armor = 0; liv_pr.damage = 2;
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		if (name == "bandit") {
 			properties.speed = 0.1f; liv_pr.health = 100; liv_pr.armor = 100; liv_pr.damage = 15;
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
-			gunSprite.setTextureRect(IntRect(0, 30, properties.sizeGun.y, properties.sizeGun.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
+			gunSprite.setTextureRect(IntRect(0, 30, int(properties.sizeGun.y), int(properties.sizeGun.x)));
 		}
 	}
 
@@ -260,7 +266,7 @@ public:
 	void same_action_enemys(float time, Vector2f posGG, int numFrame) {
 		liv_pr.CurrentFrame += 0.001f*time;
 		if (liv_pr.CurrentFrame > numFrame) liv_pr.CurrentFrame -= numFrame;
-		sprite.setTextureRect(IntRect(0, properties.sizeHero.x * int(liv_pr.CurrentFrame), properties.sizeHero.y, properties.sizeHero.x));
+		sprite.setTextureRect(IntRect(0, int(properties.sizeHero.x) * int(liv_pr.CurrentFrame), int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		properties.dist.x = posGG.x - properties.pos.x;
 		properties.dist.y = posGG.y - properties.pos.y;
 	}
@@ -314,16 +320,16 @@ public:
 		properties.pos = coord;
 		name = Name;
 		if (Name == "machineGun") {
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		else if (Name == "shotgun") {
-			sprite.setTextureRect(IntRect(0, 40, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 40, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		else if (Name == "automatical") {
-			sprite.setTextureRect(IntRect(0, 20, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 20, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		else if (Name == "rifle") {
-			sprite.setTextureRect(IntRect(0, 55, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 55, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 	}
 	void update(float time, Vector2f posGG)  override {
@@ -338,13 +344,13 @@ public:
 		properties.pos = coord;
 		name = Name;
 		if (name == "Health") {
-			sprite.setTextureRect(IntRect(100, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(100, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		else if (name == "Armor") {
-			sprite.setTextureRect(IntRect(50, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(50, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 		else if (name == "Ammo") {
-			sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+			sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		}
 
 	}
@@ -358,7 +364,7 @@ public:
 	Exit(Image &image, Vector2f coord, Vector2f sizeH, String Name) :Entity(image, coord, sizeH, Name) {
 		properties.sizeHero = sizeH;
 		properties.pos = coord;
-		sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+		sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 		sprite.setOrigin(0, 0);
 	}
 	void update(float time, Vector2f posGG)  override {
@@ -374,7 +380,7 @@ public:
 		properties.pos = coord;
 		numPortal = numPort;
 		liv_pr.health = 1000;
-		sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+		sprite.setTextureRect(IntRect(0, 0, int(properties.sizeHero.y), int(properties.sizeHero.x)));
 	}
 	void update(float time, Vector2f posGG)  override {
 		sprite.setRotation(m_rotation);

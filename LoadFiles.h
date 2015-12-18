@@ -1,4 +1,6 @@
 #pragma once
+#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 
 struct init_sounds {
 	SoundBuffer machineBuffer;//создаём буфер для звука

@@ -14,16 +14,17 @@ using namespace sf;
 
 static const sf::Vector2f WINDOW_SIZE = { 1370, 768 };
 
+
 void check_clashes_all(std::vector<Entity*>  &entities, Player &p, RenderWindow &window, game_indicators &GI) {
 	for (auto i : entities) {//проходимся по эл-там списка TODO cut on function
 		for (auto j : entities) {
-			damage_player_to_enemys(i, j);
+			damage_player_to_enemys(*i, *j);
 			clashes_enemys(i, j);
 		}
 		if (i->getRect().intersects(p.getRect())) {//если прямоугольник спрайта объекта пересекается с игроком TODO cut on function
 			damage_enemys_to_player(i, p, GI.sounds);
-			pick_up_weapon(i, p);
-			pick_up_bonuses_and_exit(i, p);
+			pick_up_weapon(*i, p);
+			pick_up_bonuses_and_exit(*i, p);
 			if (i->name == "exit" && GI.areaClean)
 				window.close();
 		}
@@ -65,7 +66,7 @@ void draw_text(RenderWindow &window, game_indicators &GI, Player p) {
 	set_param_text(GI, posit, strHP, Color::Blue);
 	window.draw(GI.font.text_albion);
 	posit = { GI.posView.x - 100, GI.posView.y - 50 };
-	if (GI.countPortal == 0) { //TODO cut on function
+	if (GI.countPortal == 0 && GI.countEnemy) { //TODO cut on function
 		GI.areaClean = true;
 		set_param_text(GI, posit, "AREA CLEAN", Color::Blue);
 		window.draw(GI.font.text_albion);//рисую этот текст
@@ -119,50 +120,56 @@ void ALL_draw(RenderWindow &window, game_indicators &GI, Player &p, std::vector<
 	window.display();
 }
 
-void start_game() {
+struct Application {
 	game_indicators GI;
 	std::vector<Entity*>  entities;
-	GI.sounds.music.play();
-
-	sf::RenderWindow window(sf::VideoMode(int(WINDOW_SIZE.x), int(WINDOW_SIZE.y)), "Alien Overkill");
-	view.reset(sf::FloatRect(0, 0, WINDOW_SIZE.x, WINDOW_SIZE.y));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
-	init_portal_in_map(entities, GI);
-
-	Vector2f posPl = { GI.player.rect.left, GI.player.rect.top };
-	Vector2f sizeHero = { GI.player.rect.height, GI.player.rect.width };
-	Vector2f sizeGun = { 72, 15 };
-	Player p(GI.pict.heroImage, GI.pict.gunImage, GI.lvl, posPl, sizeHero, sizeGun, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
+	RenderWindow window;
 	Clock clock;
 	Clock gameTime;
-
-	while (window.isOpen()) {
-		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
-		GI.pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
-		float time = float(clock.getElapsedTime().asMicroseconds());
-		GI.timeGame = gameTime.getElapsedTime().asSeconds();
-		clock.restart();
-		time = time / 800;
-		sf::Event event;
-		while (window.pollEvent(event)) {
-			if (event.type == sf::Event::Closed)
-				window.close();
-			player_shotting(event, entities, p, GI);
-		}
-
-		p.rotation_GG(GI.pos);
-		if (p.properties.life)
-			p.update(time, p.properties.pos);
-
-		skip_to_list(entities, p, GI, time);
-		create_enemy(entities, p, GI);
-		shooting_enemy(entities, p, GI);
-		check_clashes_all(entities, p, window, GI);
-
-		ALL_draw(window, GI, p, entities);
+	Player p;
+	Application() {
+		GI.sounds.music.play();
+		window.create(sf::VideoMode(int(WINDOW_SIZE.x), int(WINDOW_SIZE.y)), "Alien Overkill");
+		view.reset(sf::FloatRect(0, 0, WINDOW_SIZE.x, WINDOW_SIZE.y));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
+		init_portal_in_map(entities, GI);
+		Vector2f posPl = { GI.player.rect.left, GI.player.rect.top };
+		Vector2f sizeHero = { GI.player.rect.height, GI.player.rect.width };
+		Vector2f sizeGun = { 72, 15 };
+		Player pp2(GI.pict.heroImage, GI.pict.gunImage, GI.lvl, posPl, sizeHero, sizeGun, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
+		p = pp2;
 	}
-}
+	void update() {
+		while (window.isOpen()) {
+			Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
+			GI.pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
+			float time = float(clock.getElapsedTime().asMicroseconds());
+			GI.timeGame = gameTime.getElapsedTime().asSeconds();
+			clock.restart();
+			time = time / 800;
+			sf::Event event;
+			while (window.pollEvent(event)) {
+				if (event.type == sf::Event::Closed)
+					window.close();
+				player_shotting(event, entities, p, GI);
+			}
+
+			p.rotation_GG(GI.pos);
+			if (p.properties.life)
+				p.update(time, p.properties.pos);
+
+			skip_to_list(entities, p, GI, time);
+			create_enemy(entities, p, GI);
+			shooting_enemy(entities, p, GI);
+			check_clashes_all(entities, p, window, GI);
+
+			ALL_draw(window, GI, p, entities);
+		}
+	}
+};
+
 
 int main() {
-	start_game();
+	Application app;
+	app.update();
 	return 0;
 }
