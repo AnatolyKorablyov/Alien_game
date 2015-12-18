@@ -16,6 +16,10 @@ void damage_player_to_enemys(Entity* &one, Entity* &two) {
 			one->liv_pr.health -= two->liv_pr.damage;
 		two->properties.life = false;
 	}
+	if (one->getRect().intersects(two->getRect()) && ((two->name == "Bullet") && (one->name == "portal"))) {
+		one->liv_pr.health -= two->liv_pr.damage;
+		two->properties.life = false;
+	}
 }
 
 void pick_up_weapon(Entity* &one, Player &p) {

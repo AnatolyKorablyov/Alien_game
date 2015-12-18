@@ -44,7 +44,9 @@ struct init_picture {
 	Image solidImage;
 	Texture meetTexture;
 	Sprite meetSprite;
+	Image portalImage;
 	init_picture() {
+		portalImage.loadFromFile("images/portal.png");
 		meetTexture.loadFromFile("images/meet.png");
 		meetSprite.setTexture(meetTexture);
 		bulletImage.loadFromFile("images/shot2.png");
@@ -74,6 +76,7 @@ struct init_fonts {
 
 struct game_indicators {
 	int countEnemy = 0;
+	int countPortal = 0;
 	bool areaClean = false;
 	float timeGame;
 	Vector2f posView;
@@ -84,7 +87,7 @@ struct game_indicators {
 	Level lvl;//создали экземпл€р класса уровень
 	Object player;
 	game_indicators() {
-		lvl.LoadFromFile("map.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
+		lvl.LoadFromFile("map_and_portals.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
 		player = lvl.GetObject("player");//объект игрока на нашей карте.задаем координаты игроку в начале при помощи него
 	}
 };

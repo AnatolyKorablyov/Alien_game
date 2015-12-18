@@ -1,4 +1,5 @@
 #pragma once
+#include "InitObjOnMap.h" 
 
 void skip_to_list(std::vector<Entity*>  &entities, Player p, game_indicators &GI, float time) {
 	int randBonus;
@@ -88,13 +89,20 @@ void damage_enemys_to_player(Entity* &one, Player &p, init_sounds &sounds) {
 	}
 }
 
+void create_enemy(std::vector<Entity*>  &entities, Player p, game_indicators &GI) {
+	for (int i = 0; i < entities.size(); i++) {
+		if (entities[i]->name == "portal" && entities[i]->timeBurn < GI.timeGame) {
+			entities[i]->timeBurn = GI.timeGame + 5;
+			init_enemys_in_map(entities, GI, entities[i]->numPortal);
+		}
+	}
+}
 void shooting_enemy(std::vector<Entity*>  &entities, Player p, game_indicators &GI) {
 	std::vector<Entity*>::iterator it;
 	for (it = entities.begin(); it != entities.end(); it++) {
 		if ((*it)->name == "bandit" && ((*it)->properties.dist.x <= 500 || (*it)->properties.dist.x <= -500) && ((*it)->properties.dist.y < 300 || (*it)->properties.dist.y < 300) && (*it)->enemyShot < GI.timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
 			Vector2f sizeHero = { 23, 7 };
 			Vector2f posPl = { (*it)->properties.pos.x + (*it)->properties.sizeHero.y / 2, (*it)->properties.pos.y + (*it)->properties.sizeHero.x / 2 };
-
 			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, p.properties.pos, "enemyBullet", (*it)->liv_pr.damage, 0));
 			(*it)->enemyShot = GI.timeGame + 1;
 		}

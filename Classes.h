@@ -40,6 +40,8 @@ public:
 	characteristicts properties;
 	life_obj liv_pr;
 	float enemyShot, timeDeath;
+	float timeBurn;
+	int numPortal;
 	Texture texture, gunTexture;
 	Sprite sprite, gunSprite;
 	String name;
@@ -363,6 +365,25 @@ public:
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
+
+class Portal : public Entity {
+public:
+	float m_rotation = 0;
+	Portal(Image &image, Vector2f coord, Vector2f sizeH, String Name, int numPort) :Entity(image, coord, sizeH, Name) {
+		properties.sizeHero = sizeH;
+		properties.pos = coord;
+		numPortal = numPort;
+		liv_pr.health = 1000;
+		sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
+	}
+	void update(float time, Vector2f posGG)  override {
+		sprite.setRotation(m_rotation);
+		sprite.setPosition(properties.pos.x, properties.pos.y);
+		m_rotation += 0.5f;
+		if (liv_pr.health <= 0) { properties.life = false; }
+	}
+};
+
 
 class Bullet :public Entity {//класс пули
 public:

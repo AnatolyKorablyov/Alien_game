@@ -36,6 +36,8 @@ void draw_objects(std::vector<Entity*>  entities, game_indicators &GI, RenderWin
 		if ((*it)->name == "bandit" || (*it)->name == "easyEnemy" || (*it)->name == "mediumEnemy") {
 			GI.countEnemy += 1;
 		}
+		if ((*it)->name == "portal")
+			GI.countPortal += 1;
 		if (GI.areaClean && (*it)->name == "solidExit")
 			(*it)->properties.life = false;
 		if ((*it)->properties.pos.x > GI.posView.x - 632 && (*it)->properties.pos.x < GI.posView.x + 632 && (*it)->properties.pos.y > GI.posView.y - 384 && (*it)->properties.pos.y < GI.posView.y + 384) { // если объект выходит за экран, не рисуем
@@ -63,7 +65,7 @@ void draw_text(RenderWindow &window, game_indicators &GI, Player p) {
 	set_param_text(GI, posit, strHP, Color::Blue);
 	window.draw(GI.font.text_albion);
 	posit = { GI.posView.x - 100, GI.posView.y - 50 };
-	if (GI.countEnemy == 0) { //TODO cut on function
+	if (GI.countPortal == 0) { //TODO cut on function
 		GI.areaClean = true;
 		set_param_text(GI, posit, "AREA CLEAN", Color::Blue);
 		window.draw(GI.font.text_albion);//рисую этот текст
@@ -102,6 +104,7 @@ void draw_text(RenderWindow &window, game_indicators &GI, Player p) {
 
 void ALL_draw(RenderWindow &window, game_indicators &GI, Player &p, std::vector<Entity*>  entities) {
 	GI.countEnemy = 0;
+	GI.countPortal = 0;
 	window.setView(view);
 	window.clear();
 	GI.posView = view.getCenter();
@@ -123,7 +126,7 @@ void start_game() {
 
 	sf::RenderWindow window(sf::VideoMode(int(WINDOW_SIZE.x), int(WINDOW_SIZE.y)), "Alien Overkill");
 	view.reset(sf::FloatRect(0, 0, WINDOW_SIZE.x, WINDOW_SIZE.y));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
-	init_objects_in_map(entities, GI);
+	init_portal_in_map(entities, GI);
 
 	Vector2f posPl = { GI.player.rect.left, GI.player.rect.top };
 	Vector2f sizeHero = { GI.player.rect.height, GI.player.rect.width };
@@ -151,6 +154,7 @@ void start_game() {
 			p.update(time, p.properties.pos);
 
 		skip_to_list(entities, p, GI, time);
+		create_enemy(entities, p, GI);
 		shooting_enemy(entities, p, GI);
 		check_clashes_all(entities, p, window, GI);
 
