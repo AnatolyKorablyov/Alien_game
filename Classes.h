@@ -21,11 +21,15 @@ struct life_obj {
 	int health;
 	int armor;
 	int damage;
-	int weapon, ammo;
+	int num_weapon;
+	int main_weapon;
+	int ammo;
 	int sec_weapon;
-	bool changeSecWeap;
+	int third_weapon;
 	int main_damage;
+	int sec_damage;
 	float rotation;
+	bool change_weapon;
 	bool gameover = false;
 	float CurrentFrame;
 };
@@ -53,11 +57,12 @@ public:
 	FloatRect getRect() {//ф-ция получения прямоугольника. его коорд,размеры (шир,высот).
 		return FloatRect(properties.pos.x, properties.pos.y, properties.sizeHero.y, properties.sizeHero.x);//эта ф-ция нужна для проверки столкновений 
 	}
-	virtual void update(float time, float coordX, float coordY) = 0;
+	virtual void update(float time, Vector2f posGG) = 0;
 };
 
 class Player :public Entity {
 public:
+	bool isShoot;
 	float queueShot = 0;
 	enum { left, right, up, down, leftUp, rightUp, leftDown, rightDown, stay } state;//добавляем тип перечисления - состояние объекта
 	int playerScore;
@@ -67,8 +72,11 @@ public:
 		properties.sizeGun = sizeG;
 		name = Name;
 		obj = lvl.GetAllObjects();
-		liv_pr.health = 100; liv_pr.armor = 100; liv_pr.weapon = 1;
+		liv_pr.num_weapon = 1;
+		liv_pr.ammo = 6;
+		liv_pr.health = 100; liv_pr.armor = 100; liv_pr.main_weapon = 1;
 		playerScore = 0; state = stay;
+		liv_pr.sec_damage = 20;
 		gunTexture.loadFromImage(gunImage);
 		gunSprite.setTexture(gunTexture);
 		if (name == "Player") {
@@ -78,16 +86,30 @@ public:
 	}
 
 	void control() {
+		if (Keyboard::isKeyPressed(Keyboard::Num1)) {
+			liv_pr.num_weapon = 1;
+			liv_pr.change_weapon = true;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Num2)) {
+			liv_pr.num_weapon = 2;
+			liv_pr.change_weapon = true;
+			queueShot = 0;
+		}
+		if (Keyboard::isKeyPressed(Keyboard::Num3)) {
+			liv_pr.num_weapon = 3;
+			liv_pr.change_weapon = true;
+			queueShot = 0;
+		}
 		bool pressBut = false;
-		if (Keyboard::isKeyPressed(Keyboard::Left)) {
+		if (Keyboard::isKeyPressed(Keyboard::A)) {
 			state = left; properties.speed = 0.2f;
 			pressBut = true;
 		}
-		if (Keyboard::isKeyPressed(Keyboard::Right)) {
+		if (Keyboard::isKeyPressed(Keyboard::D)) {
 			state = right; properties.speed = 0.2f;
 			pressBut = true;
 		}
-		if (Keyboard::isKeyPressed(Keyboard::Up)) {
+		if (Keyboard::isKeyPressed(Keyboard::W)) {
 			if (pressBut) {
 				if (state == right) {
 					state = rightUp; properties.speed = 0.2f;
@@ -100,7 +122,7 @@ public:
 				state = up; properties.speed = 0.2f;
 			}
 		}
-		if (Keyboard::isKeyPressed(Keyboard::Down)) {
+		if (Keyboard::isKeyPressed(Keyboard::S)) {
 			if (pressBut) {
 				if (state == right) {
 					state = rightDown; properties.speed = 0.2f;
@@ -120,26 +142,26 @@ public:
 		liv_pr.rotation = (atan2(dY, dX)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
 	}
 	void select_weapon(life_obj &PR) {
-		if (PR.weapon == 0) {
-			gunSprite.setTextureRect(IntRect(0, 0, 72, 15));
-			PR.ammo = 100;
-			PR.damage = 15;
+		if (PR.num_weapon == 1) {
+			PR.damage = PR.main_damage;
+			if (PR.main_weapon == 0) {
+				gunSprite.setTextureRect(IntRect(0, 0, 72, 15));
+			}
+			else if (PR.main_weapon == 1) {
+				gunSprite.setTextureRect(IntRect(0, 15, 72, 15));
+			}
+			else if (PR.main_weapon == 2) {
+				gunSprite.setTextureRect(IntRect(0, 30, 72, 15));
+			}
+			else if (PR.main_weapon == 3) {
+				gunSprite.setTextureRect(IntRect(0, 45, 72, 15));
+			}
 		}
-		else if (PR.weapon == 1) {
-			PR.ammo = 4;
-			PR.damage = 30;
-			gunSprite.setTextureRect(IntRect(0, 15, 72, 15));
+		else {
+			PR.damage = PR.sec_damage;
+			gunSprite.setTextureRect(IntRect(0, 60, 72, 15));
 		}
-		else if (PR.weapon == 2) {
-			PR.ammo = 30;
-			PR.damage = 20;
-			gunSprite.setTextureRect(IntRect(0, 30, 72, 15));
-		}
-		else if (PR.weapon == 3) {
-			PR.ammo = 10;
-			PR.damage = 150;
-			gunSprite.setTextureRect(IntRect(0, 45, 72, 15));
-		}
+
 	}
 	void checkCollisionWithMap(Vector2f coordSpeed)//ф ция проверки столкновений с картой
 	{
@@ -148,22 +170,27 @@ public:
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (coordSpeed.y>0) { properties.pos.y -= 15; }
-					if (coordSpeed.y<0) { properties.pos.y += 15; }
-					if (coordSpeed.x>0) { properties.pos.x -= 15; }
-					if (coordSpeed.x<0) { properties.pos.x += 15; }
+					if (coordSpeed.y>0) { properties.pos.y -= properties.sizeHero.y / 2; }
+					else if (coordSpeed.y<0) { properties.pos.y += properties.sizeHero.y / 2; }
+					if (coordSpeed.x>0) { properties.pos.x -= properties.sizeHero.y / 2; }
+					else if (coordSpeed.x<0) { properties.pos.x += properties.sizeHero.y / 2; }
 				}
 			}
 
 	}
 
-	void update(float time, float coordX, float coordY) {
+	void update(float time, Vector2f posGG) {
 		liv_pr.CurrentFrame += 0.005f*time;
-		if (liv_pr.CurrentFrame > 4) liv_pr.CurrentFrame -= 4;
+		control();//функция управления персонажем
+		if (liv_pr.change_weapon){
+			select_weapon(liv_pr);
+			liv_pr.change_weapon = false;
+		}
+		if ((liv_pr.CurrentFrame > 4 && liv_pr.num_weapon == 1) || (liv_pr.CurrentFrame > 8 && liv_pr.num_weapon == 2)) 
+			liv_pr.CurrentFrame -= 4;
 		sprite.setTextureRect(IntRect(0, properties.sizeHero.x * int(liv_pr.CurrentFrame), properties.sizeHero.y, properties.sizeHero.x));
 		sprite.setRotation(liv_pr.rotation);//поворачиваем спрайт на эти градусы
 		gunSprite.setRotation(liv_pr.rotation);
-		control();//функция управления персонажем
 		switch (state) {
 		case right: properties.dist.x = properties.speed; properties.dist.y = 0; break;
 		case rightUp: properties.dist.x = properties.speed; properties.dist.y = -properties.speed; break;
@@ -214,31 +241,31 @@ public:
 		}
 	}
 
-	void checkCollisionWithMap(float Dx, float Dy) {//ф ция проверки столкновений с картой
+	void checkCollisionWithMap() {//ф ция проверки столкновений с картой
 		for (int i = 0; i < int(obj.size()); i++)//проходимся по объектам
 			if (getRect().intersects(obj[i].rect))//проверяем пересечение игрока с объектом
 			{
 				if (obj[i].name == "solid")//если встретили препятствие
 				{
-					if (Dy>0) { properties.pos.y -= 10; }
-					if (Dy<0) { properties.pos.y += 10; }
-					if (Dx > 0) { properties.pos.x -= 10; }
-					if (Dx < 0) { properties.pos.x += 10; }
+					if (obj[i].rect.top + obj[i].rect.width > properties.pos.y) { properties.pos.y += properties.sizeHero.y  / 2; }
+					else if (obj[i].rect.top < properties.pos.y) { properties.pos.y -= properties.sizeHero.y / 2; }
+					if (obj[i].rect.left + obj[i].rect.height > properties.pos.x) { properties.pos.x += properties.sizeHero.y / 2; }
+					else if (obj[i].rect.left < properties.pos.x) { properties.pos.x -= properties.sizeHero.y / 2; }
 				}
 			}
 	}
 
-	void same_action_enemys(float time, float posPlayerX, float posPlayerY, int numFrame) {
+	void same_action_enemys(float time, Vector2f posGG, int numFrame) {
 		liv_pr.CurrentFrame += 0.001f*time;
 		if (liv_pr.CurrentFrame > numFrame) liv_pr.CurrentFrame -= numFrame;
 		sprite.setTextureRect(IntRect(0, properties.sizeHero.x * int(liv_pr.CurrentFrame), properties.sizeHero.y, properties.sizeHero.x));
-		properties.dist.x = posPlayerX - properties.pos.x;
-		properties.dist.y = posPlayerY - properties.pos.y;
+		properties.dist.x = posGG.x - properties.pos.x;
+		properties.dist.y = posGG.y - properties.pos.y;
 	}
 
-	void update(float time, float posPlayerX, float posPlayerY) {
+	void update(float time, Vector2f posGG) {
 		if (name == "easyEnemy"|| name == "mediumEnemy")  {//для персонажа с таким именем логика будет такой
-			same_action_enemys(time, posPlayerX, posPlayerY, 2);
+			same_action_enemys(time, posGG, 2);
 			if (properties.dist.x > 0) {
 				properties.pos.x += properties.speed * time;
 			}
@@ -250,13 +277,13 @@ public:
 			else if (properties.dist.y < 0)
 				properties.pos.y -= properties.speed * time;
 			liv_pr.rotation = (atan2(properties.dist.x, properties.dist.y)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
-			checkCollisionWithMap(properties.dist.x, properties.dist.y);//обрабатываем столкновение по Х
+			checkCollisionWithMap();//обрабатываем столкновение по Х
 			sprite.setRotation(-liv_pr.rotation);
 			sprite.setPosition(properties.pos.x + properties.sizeHero.y / 2, properties.pos.y + properties.sizeHero.x / 2); //задаем позицию спрайта в место его центра
 			if (liv_pr.health <= 0) { properties.life = false; }
 		}
 		if (name == "bandit") {
-			same_action_enemys(time, posPlayerX, posPlayerY, 4);
+			same_action_enemys(time, posGG, 4);
 			if (properties.dist.x > 0 && properties.dist.x > 500) {
 				properties.pos.x += properties.speed * time;
 			}
@@ -268,7 +295,7 @@ public:
 			else if (properties.dist.y < 0 && properties.dist.y < -300)
 				properties.pos.y -= properties.speed* time;
 			liv_pr.rotation = (atan2(properties.dist.x, properties.dist.y)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
-			checkCollisionWithMap(properties.dist.x, properties.dist.y);//обрабатываем столкновение по Х
+			checkCollisionWithMap();//обрабатываем столкновение по Х
 			sprite.setRotation(-liv_pr.rotation + 90);
 			gunSprite.setRotation(-liv_pr.rotation + 90);
 			sprite.setPosition(properties.pos.x + properties.sizeHero.y / 2, properties.pos.y + properties.sizeHero.x / 2); //задаем позицию спрайта в место его центра
@@ -297,7 +324,7 @@ public:
 			sprite.setTextureRect(IntRect(0, 55, properties.sizeHero.y, properties.sizeHero.x));
 		}
 	}
-	void update(float time, float coordX, float coordY) {
+	void update(float time, Vector2f posGG) {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -319,7 +346,7 @@ public:
 		}
 
 	}
-	void update(float time, float coordX, float coordY) {
+	void update(float time, Vector2f posGG) {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -332,7 +359,7 @@ public:
 		sprite.setTextureRect(IntRect(0, 0, properties.sizeHero.y, properties.sizeHero.x));
 		sprite.setOrigin(0, 0);
 	}
-	void update(float time, float coordX, float coordY) {
+	void update(float time, Vector2f posGG) {
 		sprite.setPosition(properties.pos.x, properties.pos.y);
 	}
 };
@@ -358,7 +385,7 @@ public:
 		posStart = properties.pos;
 		liv_pr.rotation = (atan2(posTarget.y - properties.pos.x, posTarget.y - properties.pos.x)) * 180 / 3.14159265f;//получаем угол в радианах и переводим его в градусы
 	}
-	void update(float time, float coordX, float coordY) {
+	void update(float time, Vector2f posGG) {
 		properties.pos.x += properties.speed * (posTarget.x - posStart.x) * time;
 		properties.pos.y += properties.speed * (posTarget.y - posStart.y) * time;
 

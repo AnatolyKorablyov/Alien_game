@@ -12,8 +12,12 @@ using namespace sf;
 
 static const sf::Vector2f WINDOW_SIZE = { 1370, 768 };
 
-void skip_to_list(std::vector<Entity*>::iterator it, std::vector<Entity*>  &entities, Player p, Image bonusImage, Sprite meetSprite, float time, float timeGame) {
+
+void skip_to_list(std::vector<Entity*>  &entities, Player p, game_indicators &GI, float time) {
 	int randBonus;
+	Image bonusImage = GI.pict.bonusImage;
+	Sprite meetSprite = GI.pict.meetSprite;
+	std::vector<Entity*>::iterator it;
 	for (it = entities.begin(); it != entities.end();) {//говорим что проходимся от начала до конца
 		Entity *b = (*it);//для удобства, чтобы не писать (*it)->
 		if (b->properties.life == false) {
@@ -31,10 +35,10 @@ void skip_to_list(std::vector<Entity*>::iterator it, std::vector<Entity*>  &enti
 					b->sprite = meetSprite;
 					b->sprite.setTextureRect(IntRect(0, 0, 80, 80));
 					b->sprite.setPosition(b->properties.pos.x, b->properties.pos.y);
-					b->timeDeath = timeGame + 1;
+					b->timeDeath = GI.timeGame + 1;
 					it++;
 				}
-				else if (b->timeDeath < timeGame) {
+				else if (b->timeDeath < GI.timeGame) {
 					it = entities.erase(it); delete b;// если этот объект мертв, то удаляем его
 				}
 				else it++;
@@ -44,7 +48,7 @@ void skip_to_list(std::vector<Entity*>::iterator it, std::vector<Entity*>  &enti
 			}
 		}
 		else {
-			b->update(time, p.properties.pos.x, p.properties.pos.y);//вызываем ф-цию update для всех объектов (по сути для тех, кто жив)
+			b->update(time, p.properties.pos);//вызываем ф-цию update для всех объектов (по сути для тех, кто жив)
 			it++;//и идем курсором (итератором) к след объекту. так делаем со всеми объектами списка
 		}
 	}
@@ -117,25 +121,37 @@ void damage_enemys_to_player(Entity* &one, Player &p, init_sounds &sounds) {
 
 void pick_up_weapon(Entity* &one, Player &p) {
 	if (one->name == "machineGun") {
-		p.liv_pr.weapon = 0;
+		p.liv_pr.num_weapon = 1;
+		p.liv_pr.main_weapon = 0;
+		p.liv_pr.ammo = 100;
+		p.liv_pr.main_damage = 15;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
 		p.queueShot = 0;
 	}
-	if (one->name == "shotgun") {
-		p.liv_pr.weapon = 1;
+	else if (one->name == "shotgun") {
+		p.liv_pr.num_weapon = 1;
+		p.liv_pr.main_weapon = 1;
+		p.liv_pr.ammo = 4;
+		p.liv_pr.main_damage = 30;
 		p.select_weapon(p.liv_pr);
 		p.queueShot = 0;
 		one->properties.life = false;
 	}
-	if (one->name == "automatical") {
-		p.liv_pr.weapon = 2;
+	else if (one->name == "automatical") {
+		p.liv_pr.num_weapon = 1;
+		p.liv_pr.main_weapon = 2;
+		p.liv_pr.ammo = 30;
+		p.liv_pr.main_damage = 20;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
 		p.queueShot = 0;
 	}
-	if (one->name == "rifle") {
-		p.liv_pr.weapon = 3;
+	else if (one->name == "rifle") {
+		p.liv_pr.num_weapon = 1;
+		p.liv_pr.main_weapon = 3;
+		p.liv_pr.ammo = 10;
+		p.liv_pr.main_damage = 150;
 		p.select_weapon(p.liv_pr);
 		one->properties.life = false;
 		p.queueShot = 0;
@@ -166,94 +182,129 @@ void pick_up_bonuses_and_exit(Entity* &one, Player &p) {
 			p.liv_pr.health = 100;
 	}
 	if (one->name == "solidExit") {
-		p.properties.pos.y -= 20;
+		p.properties.pos.y -= p.properties.sizeHero.y / 2;
 	}
 }
-void check_clashes(std::vector<Entity*>  &entities, Player &p, init_sounds &sounds, RenderWindow &window, bool areaClean) {
+void check_clashes(std::vector<Entity*>  &entities, Player &p, RenderWindow &window, game_indicators &GI) {
 	for (auto i : entities) {//проходимся по эл-там списка TODO cut on function
 		for (auto j : entities) {
 			damage_player_to_enemys(i, j);
 			clashes_enemys(i, j);
 		}
 		if (i->getRect().intersects(p.getRect())) {//если прямоугольник спрайта объекта пересекается с игроком TODO cut on function
-			damage_enemys_to_player(i, p, sounds);
+			damage_enemys_to_player(i, p, GI.sounds);
 			pick_up_weapon(i, p);
 			pick_up_bonuses_and_exit(i, p);
-			if (i->name == "exit" && areaClean)
+			if (i->name == "exit" && GI.areaClean)
 				window.close();
 		}
 	}
 }
 
-void shooting_enemy(std::vector<Entity*>::iterator it, std::vector<Entity*>  &entities, Player p, Image bulletImage, Level lvl, float timeGame) {
+void shooting_enemy(std::vector<Entity*>  &entities, Player p, game_indicators &GI) {
+	std::vector<Entity*>::iterator it;
 	for (it = entities.begin(); it != entities.end(); it++) {
-		if ((*it)->name == "bandit" && ((*it)->properties.dist.x <= 500 || (*it)->properties.dist.x <= -500) && ((*it)->properties.dist.y < 300 || (*it)->properties.dist.y < 300) && (*it)->enemyShot < timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
+		if ((*it)->name == "bandit" && ((*it)->properties.dist.x <= 500 || (*it)->properties.dist.x <= -500) && ((*it)->properties.dist.y < 300 || (*it)->properties.dist.y < 300) && (*it)->enemyShot < GI.timeGame) {//проверка находится ли бандит на расстояннии выстрела и может ли он сделать выстрел
 			Vector2f sizeHero = { 23, 7 };
 			Vector2f posPl = { (*it)->properties.pos.x + (*it)->properties.sizeHero.y / 2, (*it)->properties.pos.y + (*it)->properties.sizeHero.x / 2 };
 			
-			entities.push_back(new Bullet(bulletImage, lvl, posPl, sizeHero, p.properties.pos, "enemyBullet", (*it)->liv_pr.damage, 0));
-			(*it)->enemyShot = timeGame + 1;
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, p.properties.pos, "enemyBullet", (*it)->liv_pr.damage, 0));
+			(*it)->enemyShot = GI.timeGame + 1;
 		}
 	}
 }
 
+void player_shotting(Event event, std::vector<Entity*>  &entities, Player &p, game_indicators &GI) {
+	if (p.isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
+		p.isShoot = false;
+	Vector2f posPl = { p.properties.pos.x + p.properties.sizeHero.y / 2, p.properties.pos.y + p.properties.sizeHero.x / 2 };
+	Vector2f sizeHero = { 23, 7 };
+	if (p.liv_pr.num_weapon == 1) {
+		if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 0 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) { //TODO cut on function
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
+			p.liv_pr.ammo -= 1;
+			p.isShoot = true;
+			p.queueShot = GI.timeGame + 0.1;
+			GI.sounds.shootMachine.play();
+		}
+		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 1 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 1));
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 2));
+			p.liv_pr.ammo -= 1;
+			p.queueShot = GI.timeGame + 1;
+			GI.sounds.shootShootGun.play();
+		}
+		else if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || p.isShoot) && p.liv_pr.main_weapon == 2 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
+			p.liv_pr.ammo -= 1;
+			p.isShoot = true;
+			p.queueShot = GI.timeGame + 0.1;
+			GI.sounds.shootMachine.play();
+		}
+		else if (event.key.code == Mouse::Left && p.liv_pr.main_weapon == 3 && p.liv_pr.ammo > 0 && GI.timeGame > p.queueShot) {
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
+			p.liv_pr.ammo -= 1;
+			p.queueShot = GI.timeGame + 2;
+			GI.sounds.shootRifle.play();
+		}
+		else if (event.key.code == Mouse::Left)
+			GI.sounds.shootReload.play();
+	}
+	else if (p.liv_pr.num_weapon == 2) {
+		if (event.key.code == Mouse::Left && GI.timeGame > p.queueShot) {
+			entities.push_back(new Bullet(GI.pict.bulletImage, GI.lvl, posPl, sizeHero, GI.pos, "Bullet", p.liv_pr.damage, 0));
+			p.queueShot = GI.timeGame + 0.2;
+			GI.sounds.shootRifle.play();
+		}
+	}
+}
 
+void draw_objects(std::vector<Entity*>  entities, game_indicators &GI, RenderWindow &window) {
+	std::vector<Entity*>::iterator it;
+	for (it = entities.begin(); it != entities.end(); it++) {
+		if ((*it)->name == "bandit" || (*it)->name == "easyEnemy" || (*it)->name == "mediumEnemy") {
+			GI.countEnemy += 1;
+		}
+		if (GI.areaClean && (*it)->name == "solidExit")
+			(*it)->properties.life = false;
+		if ((*it)->properties.pos.x > GI.posView.x - 632 && (*it)->properties.pos.x < GI.posView.x + 632 && (*it)->properties.pos.y > GI.posView.y - 384 && (*it)->properties.pos.y < GI.posView.y + 384) { // если объект выходит за экран, не рисуем
+			window.draw((*it)->gunSprite);
+			if ((*it)->name == "exit") {
+				if (GI.areaClean)
+					window.draw((*it)->sprite);
+			}
+			else
+				window.draw((*it)->sprite);
+		}
+	}
+}
 void start_game() {
-	float queueShot = 0, enemyShot = 0;
-	int countEnemy = 0;
-
-	bool areaClean = false;
-	Music music;
-	music.openFromFile("sounds/mus01.ogg");
-	//music.play();
-
-	sf::Vector2f posView;
-
-	init_sounds sounds;
-	init_picture pict;
-	int HP;
-	String strHP;
-	Font font;//шрифт 
-	font.loadFromFile("images/Albionic.ttf");//передаем нашему шрифту файл шрифта
-	Text text("", font, 40);//создаем объект текст. закидываем в объект текст строку, шрифт, размер шрифта(в пикселях);//сам объект текст (не строка)
-	text.setColor(Color::Red);//покрасили текст в красный. если убрать эту строку, то по умолчанию он белый
+	game_indicators GI;
+	std::vector<Entity*>  entities;
+	GI.sounds.music.play();
 
 	sf::RenderWindow window(sf::VideoMode(int(WINDOW_SIZE.x), int(WINDOW_SIZE.y)), "Alien Overkill");
 	view.reset(sf::FloatRect(0, 0, WINDOW_SIZE.x, WINDOW_SIZE.y));//размер "вида" камеры при создании объекта вида камеры. (потом можем менять как хотим) Что то типа инициализации.
 
-	Level lvl;//создали экземпляр класса уровень
-	lvl.LoadFromFile("map.tmx");//загрузили в него карту, внутри класса с помощью методов он ее обработает.
-
-	Object player = lvl.GetObject("player");//объект игрока на нашей карте.задаем координаты игроку в начале при помощи него
-
-	std::vector<Entity*>  entities;//создаю список, сюда буду кидать объекты.например врагов.
-	std::vector<Entity*>::iterator it;//итератор чтобы проходить по эл-там списка
-
-
 	
 
-	init_objects_in_map(lvl, entities, pict);
+	init_objects_in_map(entities, GI);
 
-	Texture meetTexture;
-	meetTexture.loadFromImage(pict.meetImage);
-	Sprite meetSprite;
-	meetSprite.setTexture(meetTexture);
-	Vector2f posPl = { player.rect.left, player.rect.top };
-	Vector2f sizeHero = { player.rect.height, player.rect.width };
+	
+	Vector2f posPl = { GI.player.rect.left, GI.player.rect.top };
+	Vector2f sizeHero = { GI.player.rect.height, GI.player.rect.width };
 	Vector2f sizeGun = { 72, 15 };
-	Player p(pict.heroImage, pict.gunImage, lvl, posPl, sizeHero, sizeGun, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
+	Player p(GI.pict.heroImage, GI.pict.gunImage, GI.lvl, posPl, sizeHero, sizeGun, "Player");//создаем объект p класса player,задаем "hero.png" как имя файла+расширение, далее координата Х,У, ширина, высота.
 	Clock clock;
 	Clock gameTime;
 
-	bool ret = false;
-	bool isShoot = false;
-	float CurrentFrame = 0;//хранит текущий кадр
 	while (window.isOpen()) {
 		std::vector<Entity*>::iterator at;//второй итератор.для взаимодействия между объектами списка
 		Vector2i pixelPos = Mouse::getPosition(window);//забираем коорд курсора
-		Vector2f pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
+		GI.pos = window.mapPixelToCoords(pixelPos);//переводим их в игровые (уходим от коорд окна)
 		float time = float(clock.getElapsedTime().asMicroseconds());
-		float timeGame = gameTime.getElapsedTime().asSeconds();
+		GI.timeGame = gameTime.getElapsedTime().asSeconds();
 		clock.restart();
 		time = time / 800;
 		sf::Event event;
@@ -261,116 +312,78 @@ void start_game() {
 			if (event.type == sf::Event::Closed)
 				window.close();
 			if (event.key.code == Keyboard::M) {
-				init_objects_in_map(lvl, entities, pict);
+				init_objects_in_map(entities, GI);
 			}
-			if (isShoot && event.type == Event::MouseButtonReleased && event.key.code == Mouse::Left)
-				isShoot = false;
-			posPl = { p.properties.pos.x + p.properties.sizeHero.y / 2, p.properties.pos.y + p.properties.sizeHero.x / 2 };
-			sizeHero = { 23, 7 };
-			if (((event.type == Event::MouseButtonPressed && event.key.code == Mouse::Left) || isShoot) && p.liv_pr.weapon == 0 && p.liv_pr.ammo > 0) { //TODO cut on function
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 0));
-				p.liv_pr.ammo -= 1;
-				isShoot = true;
-				sounds.shootMachine.play();
-			}
-			else if (event.key.code == Mouse::Left && p.liv_pr.weapon == 1 && p.liv_pr.ammo > 0 && timeGame > queueShot) {
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 0));
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 1));
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 2));
-				p.liv_pr.ammo -= 1;
-				queueShot = timeGame + 1;
-				sounds.shootShootGun.play();
-			}
-			else if (event.key.code == Mouse::Left && p.liv_pr.weapon == 2 && p.liv_pr.ammo > 0 && timeGame > queueShot) {
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 0));
-				p.liv_pr.ammo -= 1;
-				queueShot = timeGame + 0.25f;
-				sounds.shootMachine.play();
-			}
-			else if (event.key.code == Mouse::Left && p.liv_pr.weapon == 3 && p.liv_pr.ammo > 0 && timeGame > queueShot) {
-				entities.push_back(new Bullet(pict.bulletImage, lvl, posPl, sizeHero, pos, "Bullet", p.liv_pr.damage, 0));
-				p.liv_pr.ammo -= 1;
-				queueShot = timeGame + 2;
-				sounds.shootRifle.play();
-			}
-			else if (event.key.code == Mouse::Left)
-				sounds.shootReload.play();
+			player_shotting(event, entities, p, GI);
+			
 		}
-		p.rotation_GG(pos);
+		p.rotation_GG(GI.pos);
 		if (p.properties.life)
-			p.update(time, p.properties.pos.x, p.properties.pos.y);// Player update function
+			p.update(time, p.properties.pos);// Player update function
 
 
-		skip_to_list(it, entities, p, pict.bonusImage, meetSprite, time, timeGame);
-		shooting_enemy(it, entities, p, pict.bulletImage, lvl, timeGame);
-		check_clashes(entities, p, sounds, window, areaClean);
+		skip_to_list(entities, p, GI, time);
+		shooting_enemy(entities, p, GI);
+		check_clashes(entities, p, window, GI);
 
-		countEnemy = 0;
+		GI.countEnemy = 0;
 		window.setView(view);
 		window.clear();
-		posView = view.getCenter();
-		lvl.Draw(window);//рисуем новую карту
-		for (it = entities.begin(); it != entities.end(); it++) { // TODO cut on function
-			if ((*it)->name == "bandit" || (*it)->name == "easyEnemy" || (*it)->name == "mediumEnemy") {
-				countEnemy += 1;
-			}
-			if (areaClean && (*it)->name == "solidExit")
-				(*it)->properties.life = false;
-			if ((*it)->properties.pos.x > posView.x - 632 && (*it)->properties.pos.x < posView.x + 632 && (*it)->properties.pos.y > posView.y - 384 && (*it)->properties.pos.y < posView.y + 384) { // если объект выходит за экран, не рисуем
-				window.draw((*it)->gunSprite);
-				if ((*it)->name == "exit") {
-					if (areaClean)
-						window.draw((*it)->sprite);
-				}
-				else
-					window.draw((*it)->sprite);
-			}
-		}
+		GI.posView = view.getCenter();
+		GI.lvl.Draw(window);//рисуем новую карту
+		draw_objects(entities, GI, window);
 		window.draw(p.gunSprite);
 		window.draw(p.sprite);
-		text.setPosition(posView.x + 600, posView.y - 360);
-		HP = countEnemy;
-		strHP = std::to_string(HP);
-		text.setColor(Color::Blue);
-		text.setString(strHP);
-		window.draw(text);
-		if (countEnemy == 0) { //TODO cut on function
-			music.stop();
-			areaClean = true;
-			text.setPosition(posView.x - 100, posView.y - 50);//задаем позицию текста, центр камеры
-			text.setColor(Color::Blue);
-			text.setString("AREA CLEAN");//задает строку тексту
-			window.draw(text);//рисую этот текст
+		GI.font.text_albion.setPosition(GI.posView.x + 600, GI.posView.y - 360);
+		GI.font.HP = GI.countEnemy;
+		GI.font.strHP = std::to_string(GI.font.HP);
+		GI.font.text_albion.setColor(Color::Blue);
+		GI.font.text_albion.setString(GI.font.strHP);
+		window.draw(GI.font.text_albion);
+		if (GI.countEnemy == 0) { //TODO cut on function
+			//sounds.music.stop();
+			GI.areaClean = true;
+			GI.font.text_albion.setPosition(GI.posView.x - 100, GI.posView.y - 50);//задаем позицию текста, центр камеры
+			GI.font.text_albion.setColor(Color::Blue);
+			GI.font.text_albion.setString("AREA CLEAN");//задает строку тексту
+			window.draw(GI.font.text_albion);//рисую этот текст
 		}
 		if (!p.properties.life) {
-			text.setPosition(posView.x - 100, posView.y - 50);//задаем позицию текста, центр камеры
-			text.setColor(Color::Red);
-			text.setString("GAME OVER");//задает строку тексту
-			window.draw(text);//рисую этот текст
+			GI.font.text_albion.setPosition(GI.posView.x - 100, GI.posView.y - 50);//задаем позицию текста, центр камеры
+			GI.font.text_albion.setColor(Color::Red);
+			GI.font.text_albion.setString("GAME OVER");//задает строку тексту
+			window.draw(GI.font.text_albion);//рисую этот текст
 		}
 		else {
-			text.setPosition(posView.x - 610, posView.y + 290);//задаем позицию текста, слева внизу
-			text.setColor(Color::Red);
-			HP = p.liv_pr.health;
-			strHP = std::to_string(HP);
-			text.setString(strHP);//задает строку тексту
-			window.draw(text);//рисую этот текст
+			GI.font.text_albion.setPosition(GI.posView.x - 610, GI.posView.y + 290);//задаем позицию текста, слева внизу
+			GI.font.text_albion.setColor(Color::Red);
+			GI.font.HP = p.liv_pr.health;
+			GI.font.strHP = std::to_string(GI.font.HP);
+			GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
+			window.draw(GI.font.text_albion);//рисую этот текст
 
 			if (p.liv_pr.armor > 0) {
-				text.setPosition(posView.x - 530, posView.y + 290);//задаем позицию текста, слева внизу
-				text.setColor(Color::Blue); // броня
-				HP = p.liv_pr.armor;
-				strHP = std::to_string(HP);
-				text.setString(strHP);//задает строку тексту
-				window.draw(text);//рисую этот текст]
+				GI.font.text_albion.setPosition(GI.posView.x - 530, GI.posView.y + 290);//задаем позицию текста, слева внизу
+				GI.font.text_albion.setColor(Color::Blue); // броня
+				GI.font.HP = p.liv_pr.armor;
+				GI.font.strHP = std::to_string(GI.font.HP);
+				GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
+				window.draw(GI.font.text_albion);//рисую этот текст]
 			}
 
-			text.setPosition(posView.x + 500, posView.y + 290);//задаем позицию текста, слева внизу
-			text.setColor(Color::Cyan); // броня
-			HP = p.liv_pr.ammo;
-			strHP = std::to_string(HP);
-			text.setString(strHP);//задает строку тексту
-			window.draw(text);//рисую этот текст
+			GI.font.text_albion.setPosition(GI.posView.x + 500, GI.posView.y + 290);//задаем позицию текста, слева внизу
+			GI.font.text_albion.setColor(Color::Cyan); // броня
+			
+			if (p.liv_pr.num_weapon != 1) {
+				GI.font.strHP = "unlimit";
+			}
+			else {
+				GI.font.HP = p.liv_pr.ammo;
+				GI.font.strHP = std::to_string(GI.font.HP);
+			}
+
+			GI.font.text_albion.setString(GI.font.strHP);//задает строку тексту
+			window.draw(GI.font.text_albion);//рисую этот текст
 		}
 		if (p.liv_pr.gameover) {
 			window.close();
